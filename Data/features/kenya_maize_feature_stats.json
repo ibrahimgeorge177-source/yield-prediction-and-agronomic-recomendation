@@ -1,0 +1,533 @@
+{
+  "input_shape": [
+    23674,
+    120
+  ],
+  "boolean_columns_restored": [
+    "hybrid",
+    "pest_disease",
+    "drought",
+    "flood",
+    "intercrop",
+    "compost",
+    "FAW",
+    "stemborer",
+    "msv",
+    "mlnd",
+    "cutworms",
+    "aphids",
+    "blight",
+    "striga",
+    "pesticide",
+    "electricity",
+    "radio_binary",
+    "bikes_binary",
+    "cows_binary",
+    "goats_binary",
+    "chicken_binary",
+    "comp_source_manure",
+    "field_gps_flagged_invalid",
+    "plant_date_flagged_implausible",
+    "growing_season_days_flagged",
+    "hybridseed_2017_methodology_flag",
+    "seed_type_is_mixed",
+    "weed_flagged_invalid",
+    "yield_kg_ph_flagged_outlier",
+    "yield_kg_ph_crop_failure",
+    "dap_kg_ph_flagged_outlier",
+    "urea_kg_ph_flagged_outlier",
+    "npk_kg_ph_flagged_outlier",
+    "can_kg_ph_flagged_outlier",
+    "lime_kg_ph_flagged_outlier",
+    "comp_wb_pa_flagged_outlier",
+    "plot_acres_flagged_outlier",
+    "fertility_is_missing",
+    "slope_angle_num_is_missing",
+    "slope_is_missing",
+    "distance_meter_is_missing",
+    "pest_disease_is_missing",
+    "comp_method_is_missing",
+    "comp_quality_is_missing"
+  ],
+  "leakage_ratio_mean": 2.471050002168926,
+  "leakage_ratio_std": 2.2620119056744535e-07,
+  "columns_dropped_unusable": {
+    "leakage": [
+      "yield_kg_pa",
+      "yield_kg_ph_winsorized",
+      "yield_kg_ph_flagged_outlier",
+      "yield_kg_ph_crop_failure"
+    ],
+    "identifier": [
+      "unique_id",
+      "district_raw"
+    ],
+    "zero_variance": [
+      "country",
+      "season",
+      "crop",
+      "npk_kg_ph_flagged_outlier"
+    ],
+    "unit_incoherent": [
+      "prev_season_yield",
+      "comp_kg_pa"
+    ]
+  },
+  "ordinal_encodings": {
+    "distance_meter_num": {
+      "source": "distance_meter",
+      "levels": 6,
+      "coverage_pct": 56.5
+    },
+    "seed_depth_cm": {
+      "source": "seed_depth_num",
+      "levels": 5,
+      "coverage_pct": 15.8
+    },
+    "fertility_ordinal": {
+      "source": "fertility",
+      "levels": 3,
+      "coverage_pct": 75.2
+    },
+    "slope_angle_des_ordinal": {
+      "source": "slope_angle_des",
+      "levels": 4,
+      "coverage_pct": 16.1
+    }
+  },
+  "nutrient_features": {
+    "npk_blend_assumed": "17-17-17",
+    "n_kg_ph_mean": 35.67,
+    "n_kg_ph_max": 444.8,
+    "p2o5_kg_ph_mean": 44.33,
+    "k2o_kg_ph_nonzero_rows": 58,
+    "basal_n_share_median": 0.409,
+    "fertilizer_nonzero_rows": {
+      "dap_kg_ph": 20221,
+      "urea_kg_ph": 497,
+      "can_kg_ph": 14878,
+      "npk_kg_ph": 58
+    }
+  },
+  "seed_features": {
+    "uses_hybrid_seed_pct_by_year": {
+      "2016": 82.2,
+      "2017": 67.7,
+      "2018": 84.6,
+      "2019": 82.5,
+      "2020": 84.5
+    },
+    "hybrid_reported_raw_pct_by_year": {
+      "2016": 82.4,
+      "2017": 82.5,
+      "2018": 84.8,
+      "2019": 82.6,
+      "2020": 100.0
+    },
+    "holdout_localseed_positive_rows": 1162
+  },
+  "wealth_index": {
+    "asset_columns": [
+      "owns_cows",
+      "owns_chickens",
+      "owns_goats",
+      "owns_bikes",
+      "owns_oxen",
+      "owns_electricity",
+      "owns_radio"
+    ],
+    "count_vs_binary_agreement_pct": {
+      "owns_cows": 100.0,
+      "owns_chickens": 100.0,
+      "owns_goats": 100.0,
+      "owns_bikes": 100.0
+    },
+    "n_inputs_by_year": {
+      "2016": [
+        3
+      ],
+      "2017": [
+        4
+      ],
+      "2018": [
+        7
+      ],
+      "2019": [
+        5
+      ],
+      "2020": [
+        1,
+        7
+      ]
+    },
+    "naive_index_std_by_year": {
+      "2016": 0.737,
+      "2017": 0.633,
+      "2018": 0.484,
+      "2019": 0.503,
+      "2020": 0.445
+    },
+    "final_std_by_year": {
+      "2016": 1.0,
+      "2017": 1.0,
+      "2018": 1.0,
+      "2019": 1.0,
+      "2020": 1.0
+    },
+    "corr_with_target": 0.0533
+  },
+  "pest_disease": {
+    "coarse_column_used": "pest_disease",
+    "specific_binaries_available": [
+      "FAW",
+      "stemborer",
+      "msv",
+      "mlnd",
+      "cutworms",
+      "aphids",
+      "blight",
+      "striga"
+    ],
+    "specific_binary_coverage_by_year": {
+      "FAW": {
+        "2016": 0.0,
+        "2017": 67.3,
+        "2018": 0.0,
+        "2019": 68.1,
+        "2020": 100.0
+      },
+      "stemborer": {
+        "2016": 0.0,
+        "2017": 8.8,
+        "2018": 5.5,
+        "2019": 1.7,
+        "2020": 100.0
+      },
+      "msv": {
+        "2016": 0.0,
+        "2017": 2.2,
+        "2018": 3.0,
+        "2019": 3.3,
+        "2020": 100.0
+      },
+      "mlnd": {
+        "2016": 0.0,
+        "2017": 3.1,
+        "2018": 1.8,
+        "2019": 2.9,
+        "2020": 100.0
+      },
+      "cutworms": {
+        "2016": 0.0,
+        "2017": 0.0,
+        "2018": 3.6,
+        "2019": 1.8,
+        "2020": 100.0
+      },
+      "aphids": {
+        "2016": 0.0,
+        "2017": 0.0,
+        "2018": 1.9,
+        "2019": 0.8,
+        "2020": 100.0
+      },
+      "blight": {
+        "2016": 0.0,
+        "2017": 0.0,
+        "2018": 0.0,
+        "2019": 0.0,
+        "2020": 100.0
+      },
+      "striga": {
+        "2016": 0.0,
+        "2017": 0.0,
+        "2018": 0.0,
+        "2019": 0.0,
+        "2020": 99.2
+      }
+    },
+    "rows_coarse_false_but_specific_true": 973
+  },
+  "agronomic_features": {
+    "plant_date_doy_coverage_pct": 88.4,
+    "design_plant_density_coverage_pct": 39.5,
+    "intercrop_is_legume_true_rows": 15349,
+    "compost_to_nitrogen_conversion": "refused -- see docstring"
+  },
+  "missingness_flags_added": [
+    "uses_hybrid_seed_is_missing",
+    "n_kg_ph_is_missing",
+    "plant_date_doy_is_missing"
+  ],
+  "cv_folds": {
+    "n_folds": 5,
+    "seed": 20260903,
+    "group_key": "site",
+    "train_sites": 1699,
+    "rows_per_fold": {
+      "0": 3493,
+      "1": 3493,
+      "2": 3493,
+      "3": 3493,
+      "4": 3493
+    },
+    "holdout_rows": 6190
+  },
+  "screen": {
+    "coverage_threshold_pct": 60.0,
+    "gate_b_min_train_years": 2,
+    "candidates": 137,
+    "failed_gate_a": [
+      "basal_method",
+      "chicks",
+      "comp_method",
+      "comp_quality",
+      "comp_source",
+      "comp_source_manure",
+      "design_plant_density",
+      "distance_meter",
+      "distance_meter_num",
+      "ducks",
+      "guinea_fowl",
+      "lime_method",
+      "pesticide",
+      "pigs",
+      "plant_spacing",
+      "prev_season_can_kg",
+      "prev_season_dap_kg",
+      "prev_season_lime_kg",
+      "prev_season_npk_kg",
+      "prev_season_urea_kg",
+      "rabbits",
+      "row_spacing",
+      "seed_depth_cm",
+      "seed_depth_est",
+      "seed_depth_num",
+      "sheep",
+      "site_latitude",
+      "site_longitude",
+      "slope",
+      "slope_angle_des",
+      "slope_angle_des_ordinal"
+    ],
+    "gate_c_columns": [
+      "FAW",
+      "chickens",
+      "fertility",
+      "fertility_ordinal",
+      "flood",
+      "goats",
+      "growing_season_days",
+      "harvest_date",
+      "hh_num_under5",
+      "owns_chickens",
+      "owns_goats",
+      "pest_disease",
+      "weed"
+    ],
+    "n_in_full": 75,
+    "n_in_core": 87,
+    "constant_in_holdout": [
+      "comp_method_is_missing",
+      "cv_fold",
+      "distance_meter_is_missing",
+      "hybrid_reported_raw",
+      "hybridseed_2017_methodology_flag",
+      "is_holdout",
+      "lime_kg_ph_flagged_outlier",
+      "plant_date_flagged_implausible"
+    ]
+  },
+  "gate_d_dropped": [
+    "comp_method_is_missing",
+    "distance_meter_is_missing",
+    "hybrid_reported_raw",
+    "hybridseed_2017_methodology_flag",
+    "lime_kg_ph_flagged_outlier",
+    "plant_date_flagged_implausible"
+  ],
+  "roles": {
+    "lever": 47,
+    "condition": 34,
+    "flag": 21,
+    "metadata": 17,
+    "shock": 11,
+    "excluded": 4,
+    "group_key": 3
+  },
+  "availability_tiers": {
+    "ex_ante": 120,
+    "mid_season": 13,
+    "ex_post": 4
+  },
+  "manifest_decisions": {
+    "keep": 62,
+    "drop": 53,
+    "keep_core_only": 12,
+    "infrastructure": 6,
+    "quarantine": 4
+  },
+  "output_full_shape": [
+    23674,
+    70
+  ],
+  "output_core_shape": [
+    19798,
+    81
+  ],
+  "output_full_columns": [
+    "yield_kg_ph",
+    "year",
+    "is_holdout",
+    "cv_group",
+    "cv_fold",
+    "site",
+    "district",
+    "plant_date",
+    "harvest_date",
+    "cows",
+    "electricity",
+    "hh_num",
+    "hh_num_under18",
+    "owns_cows",
+    "owns_electricity",
+    "owns_oxen",
+    "plot_acres",
+    "plot_hectares",
+    "wealth_index",
+    "can_kg_ph_flagged_outlier",
+    "comp_quality_is_missing",
+    "comp_wb_pa_flagged_outlier",
+    "dap_kg_ph_flagged_outlier",
+    "fertility_is_missing",
+    "field_gps_flagged_invalid",
+    "growing_season_days_flagged",
+    "n_kg_ph_is_missing",
+    "pest_disease_is_missing",
+    "plant_date_doy_is_missing",
+    "plot_acres_flagged_outlier",
+    "slope_angle_num_is_missing",
+    "slope_is_missing",
+    "urea_kg_ph_flagged_outlier",
+    "uses_hybrid_seed_is_missing",
+    "weed_flagged_invalid",
+    "basal_n_share",
+    "can_kg_ph",
+    "can_kg_ph_winsorized",
+    "comp_wb_pa",
+    "comp_wb_pa_winsorized",
+    "compost",
+    "compost_applied",
+    "compost_wb_ph",
+    "dap_kg_ph",
+    "dap_kg_ph_winsorized",
+    "hybrid_seed_share",
+    "hybridseed_kg_ph",
+    "intercrop",
+    "intercrop_is_legume",
+    "intercrop_type",
+    "k2o_kg_ph",
+    "lime_kg_ph",
+    "lime_kg_ph_winsorized",
+    "localseed_kg_ph",
+    "n_kg_ph",
+    "npk_kg_ph",
+    "npk_kg_ph_winsorized",
+    "p2o5_kg_ph",
+    "plant_date_doy",
+    "seed_category",
+    "seed_type",
+    "seed_type_clean",
+    "seed_type_is_mixed",
+    "seed_type_primary",
+    "topdress_applied",
+    "total_nutrient_kg_ph",
+    "urea_kg_ph",
+    "urea_kg_ph_winsorized",
+    "uses_hybrid_seed",
+    "drought"
+  ],
+  "output_core_columns": [
+    "yield_kg_ph",
+    "year",
+    "is_holdout",
+    "cv_group",
+    "cv_fold",
+    "site",
+    "district",
+    "plant_date",
+    "harvest_date",
+    "cows",
+    "electricity",
+    "hh_num",
+    "hh_num_under18",
+    "owns_cows",
+    "owns_electricity",
+    "owns_oxen",
+    "plot_acres",
+    "plot_hectares",
+    "wealth_index",
+    "can_kg_ph_flagged_outlier",
+    "comp_quality_is_missing",
+    "comp_wb_pa_flagged_outlier",
+    "dap_kg_ph_flagged_outlier",
+    "fertility_is_missing",
+    "field_gps_flagged_invalid",
+    "growing_season_days_flagged",
+    "n_kg_ph_is_missing",
+    "pest_disease_is_missing",
+    "plant_date_doy_is_missing",
+    "plot_acres_flagged_outlier",
+    "slope_angle_num_is_missing",
+    "slope_is_missing",
+    "urea_kg_ph_flagged_outlier",
+    "uses_hybrid_seed_is_missing",
+    "weed_flagged_invalid",
+    "basal_n_share",
+    "can_kg_ph",
+    "can_kg_ph_winsorized",
+    "comp_wb_pa",
+    "comp_wb_pa_winsorized",
+    "compost_applied",
+    "compost_wb_ph",
+    "dap_kg_ph",
+    "dap_kg_ph_winsorized",
+    "hybrid_seed_share",
+    "hybridseed_kg_ph",
+    "intercrop",
+    "intercrop_is_legume",
+    "intercrop_type",
+    "k2o_kg_ph",
+    "lime_kg_ph",
+    "lime_kg_ph_winsorized",
+    "localseed_kg_ph",
+    "n_kg_ph",
+    "npk_kg_ph",
+    "npk_kg_ph_winsorized",
+    "p2o5_kg_ph",
+    "plant_date_doy",
+    "seed_category",
+    "seed_type",
+    "seed_type_clean",
+    "seed_type_is_mixed",
+    "seed_type_primary",
+    "topdress_applied",
+    "total_nutrient_kg_ph",
+    "urea_kg_ph",
+    "urea_kg_ph_winsorized",
+    "uses_hybrid_seed",
+    "drought",
+    "chickens",
+    "fertility",
+    "fertility_ordinal",
+    "goats",
+    "growing_season_days",
+    "hh_num_under5",
+    "owns_chickens",
+    "owns_goats",
+    "weed",
+    "FAW",
+    "flood",
+    "pest_disease"
+  ]
+}
