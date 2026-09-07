@@ -1,2 +1,26 @@
 __pycache__/
 *.pyc
+
+# Private per-developer overrides. `.env` itself IS committed -- it holds only
+# the Earth Engine project ID, which is not a credential -- but .env.local is
+# where anyone pointing the pipeline at their own Cloud project puts it, and it
+# is the file that will eventually attract something that must not be shared.
+.env.local
+
+# Credentials, belt and braces. The service-account key is stored OUTSIDE this
+# repository (~/.config/earthengine/) and .env holds only a path to it, so
+# nothing below should ever match anything. They are here so that if someone
+# later drops a key file into the working tree -- which is what happens under
+# deadline -- git refuses to stage it instead of silently publishing it.
+secrets/
+*-service-account*.json
+*service_account*.json
+*credentials*.json
+*.pem
+*.key
+
+# Earth Engine resume cache: one CSV per fetched (year, month), written by
+# scripts/fetch_gee_weather.py purely so an interrupted fetch can restart where
+# it stopped. Fully reproducible from Earth Engine, and ~700 tiny files.
+# The committed artefacts are the assembled panel and climatology beside it.
+Data/weather/_gee_cache/
