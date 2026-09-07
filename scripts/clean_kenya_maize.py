@@ -433,7 +433,7 @@ FERTILIZER_CEILINGS = {
     "lime_kg_ph": 2000,
 }
 
-WEED_VALID_RANGE = (0, 5)  # per Variables sheet: Kenya 2017 note "options 0-5"
+WEED_VALID_RANGE = {2016: (0, 3), 2017: (0, 3), 2018: (0, 3), 2019: (0, 5), 2020: (0, 5)}
 
 YIELD_WINSOR_PCTL = 0.995
 COMP_WB_WINSOR_PCTL = 0.995
@@ -492,15 +492,20 @@ def handle_outliers(ke):
         "rows_flagged": int(flag.sum()),
     }
 
-    # --- weed: values outside the documented 0-5 response range are
+    # weed: values outside the documented 0-5 and 0-3 response range (depending on year) are
     # treated as entry errors and nulled (not winsorized, since e.g. "22"
-    # is not a plausible weeding count, just corrupted) ---
-    lo, hi = WEED_VALID_RANGE
-    flag = ke["weed"].notna() & ((ke["weed"] < lo) | (ke["weed"] > hi))
-    ke["weed_flagged_invalid"] = flag
-    ke.loc[flag, "weed"] = np.nan
+    # is not a plausible weeding count, just corrupted)
+    weed_bounds = ke["year"].map(WEED_VALID_RANGE)
+    bad_weed = ke["weed"].notna() & ~ke["weed"].between(weed_bounds.str[0], weed_bounds.str[1])
+    ke.loc[bad_weed, "weed"] = np.nan
+
+    # flag = ke["weed"].notna() & ((ke["weed"] < lo) | (ke["weed"] > hi))
+    # ke["weed_flagged_invalid"] = flag
+    # ke.loc[flag, "weed"] = np.nan
+
+
     outlier_stats["weed"] = {
-        "method": f"null values outside documented range [{lo},{hi}]",
+        "method": f"null values outside documented range [{WEED_VALID_RANGE}]",
         "rows_nulled": int(flag.sum()),
     }
 
