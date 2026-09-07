@@ -1,3 +1,30 @@
 __pycache__/
 *.pyc
+<<<<<<< HEAD
 .env
+=======
+
+# Local environment configuration. Ignored per the convention set on main.
+# Copy .env.example to .env and it works -- the example carries the Earth
+# Engine project ID, which is not a credential.
+.env
+.env.local
+
+# Credentials, belt and braces. The service-account key is stored OUTSIDE this
+# repository (~/.config/earthengine/) and .env holds only a path to it, so
+# nothing below should ever match anything. They are here so that if someone
+# later drops a key file into the working tree -- which is what happens under
+# deadline -- git refuses to stage it instead of silently publishing it.
+secrets/
+*-service-account*.json
+*service_account*.json
+*credentials*.json
+*.pem
+*.key
+
+# Earth Engine resume cache: one CSV per fetched (year, month), written by
+# scripts/fetch_gee_weather.py purely so an interrupted fetch can restart where
+# it stopped. Fully reproducible from Earth Engine, and ~700 tiny files.
+# The committed artefacts are the assembled panel and climatology beside it.
+data/weather/_gee_cache/
+>>>>>>> main
