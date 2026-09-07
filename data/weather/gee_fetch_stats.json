@@ -1,0 +1,49 @@
+{
+  "requests": 0,
+  "retries": 0,
+  "null_filled_cells": {},
+  "null_counts": {
+    "rain_mm": 0,
+    "rain_days": 0,
+    "tmean_c": 0,
+    "tmax_c": 0,
+    "tmin_c": 0,
+    "gdd10": 0
+  },
+  "validation_problems": [],
+  "chirps_collection": "UCSB-CHG/CHIRPS/DAILY",
+  "era5_collection": "ECMWF/ERA5_LAND/DAILY_AGGR",
+  "years": [
+    2015,
+    2016,
+    2017,
+    2018,
+    2019,
+    2020
+  ],
+  "months": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12
+  ],
+  "climatology_years": [
+    1991,
+    2020
+  ],
+  "gdd_base_c": 10.0,
+  "gdd_cap_c": 30.0,
+  "rain_day_threshold_mm": 1.0,
+  "cells": 951,
+  "panel_rows": 68472,
+  "climatology_rows": 11412,
+  "elapsed_seconds": 1.9
+}

@@ -61,6 +61,7 @@ import pandas as pd
 # ---------------------------------------------------------------------------
 ROOT = Path(__file__).resolve().parent.parent
 CLEANED_CSV_PATH = ROOT / "data" / "cleaned" / "kenya_maize_cleaned.csv"
+WEATHER_FEATURES_PATH = ROOT / "data" / "weather" / "kenya_maize_weather_features.csv"
 FEATURES_DIR = ROOT / "data" / "features"
 FEATURES_FULL_PATH = FEATURES_DIR / "kenya_maize_features_full.csv"
 FEATURES_CORE_PATH = FEATURES_DIR / "kenya_maize_features_core.csv"
@@ -143,6 +144,142 @@ def load_cleaned():
 
     log(f"Loaded {df.shape[0]} rows x {df.shape[1]} cols; "
         f"restored {len(restored)} boolean columns lost to CSV round-tripping.")
+    return df
+
+
+# ---------------------------------------------------------------------------
+# 1b. Merge external weather features (CHIRPS rainfall + ERA5-Land temperature)
+# ---------------------------------------------------------------------------
+# Built by the three-stage pipeline in scripts/weather_locations.py ->
+# fetch_gee_weather.py -> build_weather_features.py, which resolves each row to
+# a CHIRPS grid cell and pulls monthly rainfall and temperature for that cell's
+# season from Google Earth Engine.
+#
+# Merged HERE, before drop_unusable_columns, for a mundane but load-bearing
+# reason: the join key is `unique_id`, which the very next stage drops as a
+# memorization key. Moving this call after that drop leaves nothing to join on.
+#
+# OPTIONAL BY DESIGN. The weather stages need Google credentials and a network
+# round trip; this one does not, and a contributor without an Earth Engine
+# account must still be able to reproduce the rest of the project. If the file
+# is absent the pipeline logs it and continues, and every output is exactly the
+# pre-weather output.
+#
+# THE SCREEN CANNOT SEE THE RISK IN THESE COLUMNS. Gates A-D all test coverage
+# and holdout variance, and every weather column is 100% present in all five
+# years with real variance in 2020 -- so all of them sail through. The failure
+# mode weather brings is different in kind: regional rainfall moves together
+# across a survey packed into a few hundred kilometres, so a raw monthly total
+# is substantially a season label. That is measured rather than assumed, by the
+# `year_variance_share` column added to the manifest, and it is why the
+# anomaly-against-normal variants are emitted alongside the levels.
+WEATHER_METADATA_COLUMNS = [
+    "season_year", "location_key", "weather_lat", "weather_lon",
+    "weather_location_source",
+]
+# weather_lat/weather_lon are deliberately NOT merged. They are the same 5-decimal
+# household fingerprint that ROLE_OVERRIDES already quarantines field_latitude and
+# field_longitude for, and re-admitting them under a new name would walk straight
+# back into the out-of-time collapse documented there.
+
+# Months known before the modal March planting. Everything else describes
+# weather the farmer had not yet experienced when the decisions were made.
+WEATHER_EX_ANTE_MONTH_SUFFIXES = ("_jan", "_feb")
+
+WEATHER_FEATURE_COLUMNS = []  # populated by merge_weather_features
+
+
+def _weather_tier(col):
+    # A cell's 1991-2020 normal is fixed geography, knowable years ahead; the
+    # pre-season block is last year's short rains, knowable before planting.
+    if col.endswith("_normal") or "preseason" in col:
+        return "ex_ante"
+    if col.endswith(WEATHER_EX_ANTE_MONTH_SUFFIXES):
+        return "ex_ante"
+    # Conservative on the rest. March rain is already in the ground for a
+    # farmer planting in April, but a tier is a property of the column, not of
+    # the row, and the column has to be safe for the earliest planter in it.
+    return "mid_season"
+
+
+def _weather_role(col):
+    # Anomalies are realized deviations from what the place normally gets --
+    # the same kind of thing as `drought` and `flood`, which is what `shock`
+    # already means in this taxonomy. Levels and normals describe the
+    # environment a farm sits in, which is `condition`.
+    return "shock" if "_anom_" in col else "condition"
+
+
+def merge_weather_features(df):
+    if not WEATHER_FEATURES_PATH.exists():
+        stats["weather"] = {
+            "merged": False,
+            "reason": f"{WEATHER_FEATURES_PATH.relative_to(ROOT)} not found",
+            "how_to_build": [
+                "python scripts/weather_locations.py",
+                "python scripts/fetch_gee_weather.py --project YOUR_GCP_PROJECT_ID",
+                "python scripts/build_weather_features.py",
+            ],
+        }
+        log("No weather feature file found -- continuing without rainfall and "
+            "temperature. To build them: python scripts/weather_locations.py, "
+            "then fetch_gee_weather.py, then build_weather_features.py.")
+        return df
+
+    weather = pd.read_csv(WEATHER_FEATURES_PATH, low_memory=False)
+    feature_cols = [c for c in weather.columns
+                    if c not in WEATHER_METADATA_COLUMNS + ["unique_id"]]
+
+    # Keep the provenance of the coordinate as a quality flag, but as a boolean
+    # rather than the three-level string: 97.8% of rows are a real field GPS
+    # fix, and the distinction that matters downstream is "this row's weather
+    # came from the farmer's own plot" versus "it came from a fallback that may
+    # be 20 km away".
+    weather["weather_location_is_field"] = (
+        weather["weather_location_source"] == "field"
+    ).astype("boolean")
+    feature_cols.append("weather_location_is_field")
+
+    before = len(df)
+    df = df.merge(
+        weather[["unique_id"] + feature_cols],
+        on="unique_id", how="left", validate="one_to_one",
+    )
+    assert len(df) == before, (
+        f"the weather merge changed the row count ({before} -> {len(df)}); "
+        "kenya_maize_weather_features.csv is not one row per survey row"
+    )
+
+    # Guard: a partial weather join is worse than none. It would look like an
+    # ordinary sparse feature to the gates while actually encoding which rows
+    # happened to resolve to a grid cell.
+    coverage = float(df["rain_mm_season"].notna().mean() * 100) \
+        if "rain_mm_season" in df.columns else 0.0
+    assert coverage > 99.0, (
+        f"season rainfall covers only {coverage:.1f}% of rows after the merge; "
+        "re-run scripts/build_weather_features.py before trusting these columns."
+    )
+
+    WEATHER_FEATURE_COLUMNS.clear()
+    WEATHER_FEATURE_COLUMNS.extend(feature_cols)
+
+    tiers = {c: _weather_tier(c) for c in feature_cols}
+    stats["weather"] = {
+        "merged": True,
+        "source_file": str(WEATHER_FEATURES_PATH.relative_to(ROOT)),
+        "n_features": len(feature_cols),
+        "rainfall_dataset": "UCSB-CHG/CHIRPS/DAILY (0.05 deg)",
+        "temperature_dataset": "ECMWF/ERA5_LAND/DAILY_AGGR (0.1 deg)",
+        "season_rainfall_coverage_pct": round(coverage, 1),
+        "tier_counts": pd.Series(tiers).value_counts().to_dict(),
+        "field_gps_rows_pct": round(
+            float(df["weather_location_is_field"].mean() * 100), 1
+        ),
+    }
+    log(f"Merged {len(feature_cols)} weather features "
+        f"(CHIRPS rainfall + ERA5-Land temperature via Earth Engine); "
+        f"season rainfall covers {coverage:.1f}% of rows, "
+        f"{stats['weather']['field_gps_rows_pct']}% from the farmer's own GPS fix.")
     return df
 
 
@@ -700,6 +837,41 @@ COVERAGE_THRESHOLD_PCT = 60.0
 GATE_B_MIN_TRAIN_YEARS = 2
 
 
+# The share of a feature's total variance that lies BETWEEN survey years rather
+# than within them -- a one-way ANOVA eta-squared with year as the factor. 0.0
+# means the feature says nothing about which year a row came from; 1.0 means it
+# says nothing else.
+#
+# Gates A-D catch year proxies that betray themselves through COVERAGE (a column
+# absent in 2016, constant in the holdout). This catches the other kind: a
+# column present and varying in every year whose values still separate the years
+# cleanly. Nothing is dropped on it -- a genuinely year-varying quantity like
+# season rainfall IS mostly a year effect, and that is the truth about rainfall
+# rather than a defect in the column -- but it is reported per feature so the
+# modelling package can see which inputs are carrying a season label and weigh
+# them against the out-of-time holdout deliberately.
+YEAR_VARIANCE_WARN = 0.5
+
+
+def _year_variance_shares(df, columns):
+    shares = {}
+    year = df["year"]
+    for col in columns:
+        s = pd.to_numeric(df[col], errors="coerce")
+        valid = s.notna()
+        if valid.sum() < 2:
+            continue
+        s, y = s[valid], year[valid]
+        total = float(((s - s.mean()) ** 2).sum())
+        if total <= 0:
+            continue  # constant: no variance to apportion
+        grand = s.mean()
+        grouped = y.to_frame("y").assign(v=s).groupby("y")["v"].agg(["count", "mean"])
+        between = float((grouped["count"] * (grouped["mean"] - grand) ** 2).sum())
+        shares[col] = round(between / total, 4)
+    return shares
+
+
 def _coverage_by_year(df, columns):
     cov = {}
     for year in ALL_YEARS:
@@ -760,6 +932,7 @@ def screen_feature_stability(df):
         const_holdout[col] = bool(len(hs) > 0 and hs.nunique() <= 1)
     screen["near_zero_variance"] = pd.Series(nzv)
     screen["constant_in_holdout"] = pd.Series(const_holdout)
+    screen["year_variance_share"] = pd.Series(_year_variance_shares(df, candidates))
 
     stats["screen"] = {
         "coverage_threshold_pct": COVERAGE_THRESHOLD_PCT,
@@ -887,6 +1060,16 @@ def assign_roles_and_tiers(df, screen):
             roles[col], tiers[col], notes[col] = ROLE_OVERRIDES[col]
             continue
         notes[col] = ""
+        if col in WEATHER_FEATURE_COLUMNS:
+            # Handled first so a weather column is never mistaken for something
+            # else by a name-suffix rule below -- `weather_location_is_field`
+            # would otherwise be swept up by the FLAG_SUFFIXES branch, and the
+            # tier rules here are specific to what the column measures.
+            roles[col] = ("flag" if col == "weather_location_is_field"
+                          else _weather_role(col))
+            tiers[col] = ("ex_ante" if col == "weather_location_is_field"
+                          else _weather_tier(col))
+            continue
         if col in ROLE_GROUP_KEY:
             roles[col] = "group_key"
         elif col in ROLE_METADATA or col in RAW_DATE_COLUMNS:
@@ -1044,9 +1227,31 @@ DERIVED_SOURCES = {
 AGGREGATE_FEATURES = {"wealth_index", "total_nutrient_kg_ph", "n_kg_ph", "p2o5_kg_ph", "k2o_kg_ph"}
 
 
+def _weather_built_from(name):
+    """Which Earth Engine collection a weather column ultimately came from.
+    Rain-day counts and rainfall are CHIRPS; everything temperature-derived,
+    degree days included, is ERA5-Land."""
+    if name == "weather_location_is_field":
+        return "weather_locations.py fallback ladder"
+    if name.startswith("rain"):
+        return "UCSB-CHG/CHIRPS/DAILY"
+    return "ECMWF/ERA5_LAND/DAILY_AGGR"
+
+
 def _decision_reason(row, name):
     if row["notes"]:
         return row["notes"]
+    if name in WEATHER_FEATURE_COLUMNS and (row["in_full"] or row["in_core"]):
+        share = row["year_variance_share"]
+        # Weather clears the coverage gates trivially, so the useful thing to
+        # record against it is the risk the gates cannot see.
+        if pd.notna(share):
+            return (f"External {row['availability_tier']} weather covariate; "
+                    f"{share:.0%} of its variance is between seasons rather "
+                    f"than between places"
+                    + (" -- treat as substantially a year label."
+                       if share >= YEAR_VARIANCE_WARN else "."))
+        return f"External {row['availability_tier']} weather covariate."
     if row["role"] == "group_key":
         return "Cross-validation grouping key, emitted as infrastructure."
     if row["role"] == "metadata":
@@ -1069,7 +1274,9 @@ def _decision_reason(row, name):
 def build_manifest(df, screen):
     rows = []
     for name, row in screen.iterrows():
-        if name in DERIVED_SOURCES:
+        if name in WEATHER_FEATURE_COLUMNS:
+            source = "external"
+        elif name in DERIVED_SOURCES:
             source = "aggregate" if name in AGGREGATE_FEATURES else "derived"
         elif name.endswith(FLAG_SUFFIXES):
             source = "flag"
@@ -1090,7 +1297,8 @@ def build_manifest(df, screen):
         rows.append({
             "feature": name,
             "source": source,
-            "built_from": DERIVED_SOURCES.get(name, ""),
+            "built_from": (_weather_built_from(name) if source == "external"
+                           else DERIVED_SOURCES.get(name, "")),
             "dtype": str(df[name].dtype) if name in df.columns else "",
             "role": row["role"],
             "availability_tier": row["availability_tier"],
@@ -1105,6 +1313,7 @@ def build_manifest(df, screen):
             "in_core": bool(row["in_core"]),
             "near_zero_variance": bool(row["near_zero_variance"]),
             "constant_in_holdout": bool(row["constant_in_holdout"]),
+            "year_variance_share": row["year_variance_share"],
             "decision": decision,
             "decision_reason": _decision_reason(row, name),
         })
@@ -1113,6 +1322,25 @@ def build_manifest(df, screen):
         ["decision", "role", "feature"]
     ).reset_index(drop=True)
     stats["manifest_decisions"] = manifest["decision"].value_counts().to_dict()
+
+    kept = manifest[manifest["decision"].isin(["keep", "keep_core_only"])]
+    year_labels = kept[kept["year_variance_share"] >= YEAR_VARIANCE_WARN]
+    stats["year_variance"] = {
+        "warn_threshold": YEAR_VARIANCE_WARN,
+        "kept_features_above_threshold": int(len(year_labels)),
+        "worst": year_labels.nlargest(10, "year_variance_share")[
+            ["feature", "source", "year_variance_share"]
+        ].to_dict("records"),
+    }
+    if len(year_labels):
+        log(f"{len(year_labels)} kept feature(s) carry >={YEAR_VARIANCE_WARN:.0%} "
+            f"of their variance between years rather than within them "
+            f"(worst: "
+            + ", ".join(
+                f"{r.feature} {r.year_variance_share:.2f}"
+                for r in year_labels.nlargest(3, "year_variance_share").itertuples()
+            )
+            + "). Not dropped -- see year_variance_share in the manifest.")
     log(f"Built manifest over {len(manifest)} candidate columns: "
         + ", ".join(f"{k}={v}" for k, v in stats["manifest_decisions"].items()) + ".")
     return manifest
@@ -1178,6 +1406,7 @@ def save(df, manifest):
 
 def run():
     df = load_cleaned()
+    df = merge_weather_features(df)
     df = drop_unusable_columns(df)
     df = encode_ordinals(df)
     df = build_nutrient_features(df)
