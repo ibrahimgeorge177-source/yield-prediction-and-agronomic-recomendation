@@ -199,8 +199,8 @@
       "rows_flagged": 23
     },
     "weed": {
-      "method": "null values outside documented range [0,5]",
-      "rows_nulled": 7
+      "method": "null values outside documented range [{2016: (0, 3), 2017: (0, 3), 2018: (0, 3), 2019: (0, 5), 2020: (0, 5)}]",
+      "rows_nulled": 23
     }
   },
   "missingness_flag_columns_added": [
@@ -238,7 +238,7 @@
   ],
   "final_shape": [
     23674,
-    120
+    119
   ],
   "final_columns": [
     "unique_id",
@@ -353,7 +353,6 @@
     "comp_wb_pa_flagged_outlier",
     "comp_wb_pa_winsorized",
     "plot_acres_flagged_outlier",
-    "weed_flagged_invalid",
     "fertility_is_missing",
     "slope_angle_num_is_missing",
     "slope_is_missing",

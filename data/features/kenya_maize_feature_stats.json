@@ -1,7 +1,7 @@
 {
   "input_shape": [
     23674,
-    120
+    119
   ],
   "boolean_columns_restored": [
     "hybrid",
@@ -31,7 +31,6 @@
     "growing_season_days_flagged",
     "hybridseed_2017_methodology_flag",
     "seed_type_is_mixed",
-    "weed_flagged_invalid",
     "yield_kg_ph_flagged_outlier",
     "yield_kg_ph_crop_failure",
     "dap_kg_ph_flagged_outlier",
@@ -289,7 +288,7 @@
   "screen": {
     "coverage_threshold_pct": 60.0,
     "gate_b_min_train_years": 2,
-    "candidates": 227,
+    "candidates": 226,
     "failed_gate_a": [
       "basal_method",
       "chicks",
@@ -339,8 +338,8 @@
       "rain_mm_plant_to_harvest",
       "weed"
     ],
-    "n_in_full": 164,
-    "n_in_core": 177,
+    "n_in_full": 163,
+    "n_in_core": 176,
     "constant_in_holdout": [
       "comp_method_is_missing",
       "cv_fold",
@@ -363,19 +362,19 @@
   "roles": {
     "condition": 118,
     "lever": 47,
-    "flag": 22,
+    "flag": 21,
     "metadata": 17,
     "shock": 16,
     "excluded": 4,
     "group_key": 3
   },
   "availability_tiers": {
-    "ex_ante": 141,
+    "ex_ante": 140,
     "mid_season": 82,
     "ex_post": 4
   },
   "manifest_decisions": {
-    "keep": 151,
+    "keep": 150,
     "drop": 53,
     "keep_core_only": 13,
     "infrastructure": 6,
@@ -439,11 +438,11 @@
   },
   "output_full_shape": [
     23674,
-    159
+    158
   ],
   "output_core_shape": [
     19798,
-    171
+    170
   ],
   "output_full_columns": [
     "yield_kg_ph",
@@ -564,7 +563,6 @@
     "urea_kg_ph_flagged_outlier",
     "uses_hybrid_seed_is_missing",
     "weather_location_is_field",
-    "weed_flagged_invalid",
     "basal_n_share",
     "can_kg_ph",
     "can_kg_ph_winsorized",
@@ -725,7 +723,6 @@
     "urea_kg_ph_flagged_outlier",
     "uses_hybrid_seed_is_missing",
     "weather_location_is_field",
-    "weed_flagged_invalid",
     "basal_n_share",
     "can_kg_ph",
     "can_kg_ph_winsorized",

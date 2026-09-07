@@ -168,7 +168,6 @@ slope_is_missing,flag,,boolean,flag,ex_ante,100.0,100.0,100.0,100.0,100.0,100.0,
 urea_kg_ph_flagged_outlier,flag,,boolean,flag,ex_ante,100.0,100.0,100.0,100.0,100.0,100.0,5,True,True,False,True,True,True,True,False,0.0002,keep,Stable across all five survey years and the holdout.
 uses_hybrid_seed_is_missing,flag,,bool,flag,ex_ante,100.0,100.0,100.0,100.0,100.0,100.0,5,True,True,False,True,True,True,True,False,0.0113,keep,Stable across all five survey years and the holdout.
 weather_location_is_field,external,weather_locations.py fallback ladder,boolean,flag,ex_ante,100.0,100.0,100.0,100.0,100.0,100.0,5,True,True,False,True,True,True,True,False,0.028,keep,External ex_ante weather covariate; 3% of its variance is between seasons rather than between places.
-weed_flagged_invalid,flag,,boolean,flag,ex_ante,100.0,100.0,100.0,100.0,100.0,100.0,5,True,True,False,True,True,True,True,False,0.0008,keep,Stable across all five survey years and the holdout.
 basal_n_share,derived,dap_kg_ph_winsorized|n_kg_ph,float64,lever,ex_ante,92.3,88.4,89.5,90.1,89.1,88.4,5,True,True,False,True,True,True,False,False,0.2167,keep,Stable across all five survey years and the holdout.
 can_kg_ph,raw,,float64,lever,ex_ante,100.0,100.0,100.0,100.0,98.5,98.5,5,True,True,False,True,True,True,False,False,0.0797,keep,Stable across all five survey years and the holdout.
 can_kg_ph_winsorized,raw,,float64,lever,ex_ante,100.0,100.0,100.0,100.0,98.5,98.5,5,True,True,False,True,True,True,False,False,0.0987,keep,Stable across all five survey years and the holdout.
