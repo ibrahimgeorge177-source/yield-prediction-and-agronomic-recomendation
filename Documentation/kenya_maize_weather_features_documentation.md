@@ -197,10 +197,10 @@ The tier rule is deliberately conservative. March rain is already in the ground 
 
 | | Without weather | With weather |
 |---|---:|---:|
-| `kenya_maize_features_full.csv` | 23,674 × 70 | 23,674 × 159 |
-| `kenya_maize_features_core.csv` | 19,798 × 81 | 19,798 × 171 |
-| Manifest rows | 137 | 227 |
-| Tiers | 120 `ex_ante`, 13 `mid_season` | 141 `ex_ante`, 82 `mid_season` |
+| `kenya_maize_features_full.csv` | 23,674 × 69 | 23,674 × 158 |
+| `kenya_maize_features_core.csv` | 19,798 × 80 | 19,798 × 170 |
+| Manifest rows | 136 | 226 |
+| Tiers | 119 `ex_ante`, 13 `mid_season` | 140 `ex_ante`, 82 `mid_season` |
 
 All 89 weather features clear Gates A–D — which, as §5 argues, is the point rather than the reassurance.
 
