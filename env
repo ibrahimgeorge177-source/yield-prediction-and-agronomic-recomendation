@@ -1,0 +1,26 @@
+# Project-level environment defaults.
+#
+# NOT A SECRETS FILE -- this file is committed to git.
+#
+# Everything below is a project ID or a file path. Neither is a credential.
+# NEVER paste a private key, service-account JSON body, API key or password
+# here: this file is tracked, so anything added to it goes to GitHub and to
+# every teammate who clones the repo. Secrets live outside the repository, and
+# this file only ever points at them.
+#
+# Need a private override? Put it in .env.local -- gitignored, and read first,
+# so it wins. A real shell environment variable beats both files:
+#     export EE_PROJECT=your-own-project     (bash)
+#     $env:EE_PROJECT = "your-own-project"   (PowerShell)
+
+# Google Cloud project registered for Earth Engine, used by
+# scripts/fetch_gee_weather.py.
+EE_PROJECT=ontrack-356205
+
+# PATH TO the service-account key -- not the key itself. Deliberately outside
+# the repository, next to the credentials `earthengine authenticate` writes, so
+# it cannot be committed by accident. `~` is expanded.
+#
+# Leave this blank (or delete the line) to fall back to interactive
+# `earthengine authenticate` credentials instead.
+EE_SERVICE_ACCOUNT_KEY=~/.config/earthengine/ontrack-356205-service-account.json
