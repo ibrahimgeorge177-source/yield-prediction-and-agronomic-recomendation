@@ -1,7 +1,7 @@
 {
   "input_shape": [
     23674,
-    120
+    119
   ],
   "boolean_columns_restored": [
     "hybrid",
@@ -31,7 +31,6 @@
     "growing_season_days_flagged",
     "hybridseed_2017_methodology_flag",
     "seed_type_is_mixed",
-    "weed_flagged_invalid",
     "yield_kg_ph_flagged_outlier",
     "yield_kg_ph_crop_failure",
     "dap_kg_ph_flagged_outlier",
@@ -50,7 +49,7 @@
     "comp_quality_is_missing"
   ],
   "leakage_ratio_mean": 2.471050002168926,
-  "leakage_ratio_std": 2.2620119056744535e-07,
+  "leakage_ratio_std": 2.2620119056744537e-07,
   "columns_dropped_unusable": {
     "leakage": [
       "yield_kg_pa",
@@ -276,7 +275,7 @@
   "screen": {
     "coverage_threshold_pct": 60.0,
     "gate_b_min_train_years": 2,
-    "candidates": 137,
+    "candidates": 136,
     "failed_gate_a": [
       "basal_method",
       "chicks",
@@ -325,8 +324,8 @@
       "pest_disease",
       "weed"
     ],
-    "n_in_full": 75,
-    "n_in_core": 87,
+    "n_in_full": 74,
+    "n_in_core": 86,
     "constant_in_holdout": [
       "comp_method_is_missing",
       "cv_fold",
@@ -349,19 +348,19 @@
   "roles": {
     "lever": 47,
     "condition": 34,
-    "flag": 21,
+    "flag": 20,
     "metadata": 17,
     "shock": 11,
     "excluded": 4,
     "group_key": 3
   },
   "availability_tiers": {
-    "ex_ante": 120,
+    "ex_ante": 119,
     "mid_season": 13,
     "ex_post": 4
   },
   "manifest_decisions": {
-    "keep": 62,
+    "keep": 61,
     "drop": 53,
     "keep_core_only": 12,
     "infrastructure": 6,
@@ -369,11 +368,11 @@
   },
   "output_full_shape": [
     23674,
-    70
+    69
   ],
   "output_core_shape": [
     19798,
-    81
+    80
   ],
   "output_full_columns": [
     "yield_kg_ph",
@@ -410,7 +409,6 @@
     "slope_is_missing",
     "urea_kg_ph_flagged_outlier",
     "uses_hybrid_seed_is_missing",
-    "weed_flagged_invalid",
     "basal_n_share",
     "can_kg_ph",
     "can_kg_ph_winsorized",
@@ -482,7 +480,6 @@
     "slope_is_missing",
     "urea_kg_ph_flagged_outlier",
     "uses_hybrid_seed_is_missing",
-    "weed_flagged_invalid",
     "basal_n_share",
     "can_kg_ph",
     "can_kg_ph_winsorized",
