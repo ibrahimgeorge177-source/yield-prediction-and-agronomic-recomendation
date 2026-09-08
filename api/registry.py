@@ -150,26 +150,82 @@ class ModelRegistry:
         return self.load()
 
 
-def _download_artefact(url: str, target: Path) -> None:
-    """Fetch the artefact archive named by MODEL_URL into `target`.
+GZIP_MAGIC, ZIP_MAGIC = b"\x1f\x8b", b"PK\x03\x04"
+PICKLE_MAGIC = (b"\x80", b"\x78", b"ZL", b"\x04\x22\x4d\x18")   # pickle, zlib, joblib, lz4
+MIN_ARTEFACT_BYTES = 1_000_000                                   # smallest real build is tens of MB
 
-    Accepts a bare pipeline.joblib, or a .zip / .tar.gz containing one.
+
+def _download_artefact(url: str, target: Path) -> None:
+    """Fetch the artefact named by MODEL_URL into `target`.
+
+    Accepts a bare pipeline.joblib, or a .zip / .tar.gz containing one. The
+    format is decided by the payload's magic bytes rather than by the URL
+    suffix, because the common misconfiguration is a URL that returns something
+    else entirely -- a GitHub release *page* (HTML), an API URL (JSON), or a
+    login redirect. Storing one of those as pipeline.joblib produces a far worse
+    symptom later: joblib.load fails deep inside the unpickler with
+    "IndexError: pop from empty list", which says nothing about the real cause.
     """
     log.info("downloading model artefact from %s", url)
     target.mkdir(parents=True, exist_ok=True)
-    with urllib.request.urlopen(url, timeout=600) as response:   # noqa: S310
+
+    # GitHub serves an asset's metadata as JSON for api.github.com URLs unless
+    # the caller asks for the bytes; with this header both that URL and the
+    # browser download URL return the artefact itself.
+    request = urllib.request.Request(url, headers={
+        "Accept": "application/octet-stream",
+        "User-Agent": "kenya-maize-yield-api",
+    })
+    with urllib.request.urlopen(request, timeout=600) as response:   # noqa: S310
+        content_type = (response.headers.get("Content-Type") or "").split(";")[0].strip()
         payload = response.read()
 
-    if url.endswith(".zip"):
+    _reject_if_not_an_artefact(url, payload, content_type)
+
+    if payload.startswith(ZIP_MAGIC):
         with zipfile.ZipFile(io.BytesIO(payload)) as archive:
             _extract_member(archive.namelist(), archive.read, target)
-    elif url.endswith((".tar.gz", ".tgz")):
+    elif payload.startswith(GZIP_MAGIC):
         with tarfile.open(fileobj=io.BytesIO(payload), mode="r:gz") as archive:
             names = archive.getnames()
             _extract_member(names, lambda n: archive.extractfile(n).read(), target)
     else:
         (target / "pipeline.joblib").write_bytes(payload)
-    log.info("model artefact written to %s", target)
+
+    artefact = target / "pipeline.joblib"
+    log.info("model artefact written to %s (%.1f MB)", artefact,
+             artefact.stat().st_size / 1e6)
+
+
+def _reject_if_not_an_artefact(url: str, payload: bytes, content_type: str) -> None:
+    """Fail with the actual problem, before anything unloadable reaches disk."""
+    head = payload[:16].lstrip()
+    looks_like_text = (content_type in {"text/html", "application/json", "text/plain"}
+                       or head[:1] in (b"<", b"{", b"["))
+    if looks_like_text:
+        excerpt = payload[:200].decode("utf-8", "replace").replace("\n", " ")
+        hint = ""
+        if "api.github.com" in url:
+            hint = (" This looks like a GitHub API URL, which returns the asset's "
+                    "metadata; use the release's browser_download_url instead.")
+        elif "/releases/tag/" in url or url.rstrip("/").endswith("/releases"):
+            hint = (" This is the release *page*, not the asset; use the "
+                    "browser_download_url, which ends in the file name.")
+        raise ValueError(
+            f"MODEL_URL returned {content_type or 'text'} rather than a model artefact."
+            f"{hint} First bytes: {excerpt!r}")
+
+    if len(payload) < MIN_ARTEFACT_BYTES:
+        raise ValueError(
+            f"MODEL_URL returned only {len(payload):,} bytes, far smaller than any real "
+            "artefact (tens of MB). The download was probably truncated or redirected.")
+
+    if not (payload.startswith(ZIP_MAGIC) or payload.startswith(GZIP_MAGIC)
+            or any(payload.startswith(m) for m in PICKLE_MAGIC)):
+        raise ValueError(
+            f"MODEL_URL returned {len(payload):,} bytes that are neither a zip, a gzip "
+            f"archive, nor a joblib file (first bytes: {payload[:8]!r}). Point MODEL_URL "
+            "at a .tar.gz produced by scripts/package_model_artifact.py.")
 
 
 def _extract_member(names: list[str], read, target: Path) -> None:
