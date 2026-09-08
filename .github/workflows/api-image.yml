@@ -1,0 +1,116 @@
+name: API image
+
+# Builds the container and proves it serves before anything reaches Railway.
+# The smoke test runs without a model artefact on purpose: that is the state a
+# fresh deployment starts in, and the service is designed to boot and explain
+# itself rather than crash-loop.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "api/**"
+      - "scripts/district_model.py"
+      - "scripts/district_nn.py"
+      - "scripts/fetch_model_artifact.py"
+      - "data/api/**"
+      - "requirements.txt"
+      - "Dockerfile"
+      - ".dockerignore"
+      - "railway.json"
+      - ".github/workflows/api-image.yml"
+  pull_request:
+    paths:
+      - "api/**"
+      - "scripts/district_model.py"
+      - "scripts/district_nn.py"
+      - "requirements.txt"
+      - "Dockerfile"
+  workflow_dispatch:
+
+jobs:
+  # Runs without a model artefact, which is the state of a fresh checkout. The
+  # tests that need weights skip themselves; what remains still exercises the
+  # request path — enough to catch a router calling a method that no longer
+  # exists, which is how a bare 500 once reached production.
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies (CPU torch only)
+        run: |
+          python -m pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu "torch>=2.2,<3.0"
+          pip install -r requirements.txt pytest
+
+      - name: Run the API test suite
+        run: pytest tests/ -q
+
+  build-and-smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: maize-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Start container
+        run: |
+          docker run -d --name maize-api -p 8080:8080 \
+            -e ENVIRONMENT=ci -e LOG_LEVEL=INFO maize-api:ci
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8080/health > /dev/null 2>&1; then
+              echo "up after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "service did not become healthy"; docker logs maize-api; exit 1
+
+      - name: Smoke test — endpoints that work without the model artefact
+        run: |
+          set -euo pipefail
+          curl -fsS http://127.0.0.1:8080/health | tee /dev/stderr | grep -q '"status"'
+          curl -fsS http://127.0.0.1:8080/ | grep -q '"endpoints"'
+          curl -fsS http://127.0.0.1:8080/api/v1/model/summary | grep -q '"model_version"'
+          curl -fsS http://127.0.0.1:8080/api/v1/reference/districts | grep -q '\['
+          curl -fsS http://127.0.0.1:8080/openapi.json > /dev/null
+          echo "reference and health endpoints OK"
+
+      - name: Smoke test — prediction degrades honestly without an artefact
+        run: |
+          set -euo pipefail
+          code=$(curl -s -o /tmp/body.json -w '%{http_code}' \
+            -X POST http://127.0.0.1:8080/api/v1/predict \
+            -H 'Content-Type: application/json' \
+            -d '{"plots":[{"district":"kabiyet","year":2021}]}')
+          cat /tmp/body.json
+          if [ "$code" != "503" ]; then
+            echo "expected 503 without a model artefact, got $code"; exit 1
+          fi
+          grep -q "not available" /tmp/body.json
+          echo "prediction returns an actionable 503, as designed"
+
+      - name: Container logs
+        if: always()
+        run: docker logs maize-api || true
+
+      - name: Stop container
+        if: always()
+        run: docker rm -f maize-api || true

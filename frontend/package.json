@@ -1,0 +1,23 @@
+{
+  "name": "kenya-maize-yield-pwa",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Progressive web app for the Kenya maize district yield prediction API",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0 --port ${PORT:-4173}",
+    "lint": "echo \"no linter configured\" && exit 0"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.8",
+    "vite-plugin-pwa": "^0.20.5"
+  }
+}

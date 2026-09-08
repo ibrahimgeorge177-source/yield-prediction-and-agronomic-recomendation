@@ -1,0 +1,40 @@
+# Rendered by the nginx image's envsubst at container start, so ${PORT} becomes
+# whatever the platform injects.
+
+server {
+    listen       ${PORT};
+    listen       [::]:${PORT};
+    server_name  _;
+
+    root  /usr/share/nginx/html;
+    index index.html;
+
+    gzip              on;
+    gzip_types        text/css application/javascript application/json image/svg+xml;
+    gzip_min_length   1024;
+
+    # Fingerprinted assets are immutable; everything else must revalidate so a
+    # redeploy is picked up on the next visit.
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # A service worker that is cached defeats the point of autoUpdate.
+    location = /sw.js {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+    }
+    location = /manifest.webmanifest {
+        add_header Cache-Control "no-cache";
+        types { } default_type application/manifest+json;
+    }
+
+    # Client-side routing: unknown paths are app routes, not 404s.
+    location / {
+        try_files $uri $uri/ /index.html;
+        add_header Cache-Control "no-cache";
+        add_header X-Content-Type-Options "nosniff";
+        add_header X-Frame-Options "SAMEORIGIN";
+        add_header Referrer-Policy "strict-origin-when-cross-origin";
+    }
+}

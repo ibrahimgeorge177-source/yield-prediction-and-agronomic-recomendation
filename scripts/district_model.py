@@ -394,6 +394,26 @@ class IntervalModel:
         return pred - z * s, pred + z * s
 
 
+def library_versions() -> dict:
+    """Versions that fitted the artefact.
+
+    A pickled estimator is only guaranteed to load in the version that wrote it —
+    scikit-learn 1.6 → 1.7 silently drops `SimpleImputer._fill_dtype`, and the
+    failure surfaces much later as an AttributeError on the first prediction.
+    Recording them here lets the service compare and say so at load time.
+    """
+    import sklearn
+    mods = {"scikit-learn": sklearn, "numpy": np, "pandas": pd,
+            "lightgbm": lgb, "xgboost": xgb, "joblib": joblib}
+    out = {name: getattr(m, "__version__", "?") for name, m in mods.items()}
+    try:
+        import torch
+        out["torch"] = torch.__version__
+    except ImportError:
+        pass
+    return out
+
+
 def district_metrics(actual: np.ndarray, pred: np.ndarray,
                      n_plots: np.ndarray | None = None) -> dict:
     actual, pred = np.asarray(actual, float), np.asarray(pred, float)
@@ -454,7 +474,8 @@ class DistrictPipeline:
         else:                                   # no validation seasons: fall back to plot spread
             self.intervals_.a = float((train.groupby("district", observed=True)[TARGET]
                                        .mean().std()) ** 2 * 0.5)
-        self.metadata_.update(train_years=list(map(int, train_years)),
+        self.metadata_.update(library_versions=library_versions(),
+                              train_years=list(map(int, train_years)),
                               val_years=[int(v) for v in val_years],
                               n_train_plots=int(len(train)),
                               members=sorted({m.name for m in self.ensemble_.members_} |
