@@ -1,0 +1,44 @@
+# Keep the build context small: the API reads two JSON files and the model
+# artefact, nothing else. The survey data, the weather cache and the notebooks
+# are ~200 MB that would otherwise be uploaded to the builder on every build.
+
+.git/
+.github/
+.gitignore
+.DS_Store
+**/.DS_Store
+
+# Everything under data/ except the two files the service actually reads.
+data/*
+!data/api/
+data/api/*.tmp
+
+# Model artefacts are supplied through MODEL_URL or a mounted volume, never
+# through the build context — they are gitignored and 90-125 MB each.
+**/*.joblib
+
+notebooks/
+Documentation/
+*.docx
+
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+.venv/
+venv/
+env/
+
+.env
+.env.local
+secrets/
+*.pem
+*.key
+*service_account*.json
+*credentials*.json
+
+# Local tooling that has no business in an image
+Procfile
+*.md
+!README.md

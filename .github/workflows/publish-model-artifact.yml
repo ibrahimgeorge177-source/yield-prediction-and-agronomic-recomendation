@@ -1,0 +1,101 @@
+name: Publish model artefact
+
+# Trains the district model and attaches it to a GitHub Release, which is how
+# the 90-125 MB artefact reaches a deployment: it is too large for the repository
+# but well inside the 2 GB limit for a release asset.
+#
+# Run it from the Actions tab. The release URL it prints is what MODEL_URL wants.
+
+on:
+  workflow_dispatch:
+    inputs:
+      train:
+        description: "Training seasons"
+        default: "2016-2020"
+      val:
+        description: "Validation seasons (interval calibration)"
+        default: "2019,2020"
+      test:
+        description: "Season scored once ('none' for a production build)"
+        default: "none"
+      name:
+        description: "Artefact name"
+        default: "district_v2"
+      top_configs:
+        description: "Configurations averaged per family (fewer = smaller artefact)"
+        default: "5"
+      include_nn:
+        description: "Include the neural member (needs torch, ~2x artefact size)"
+        type: boolean
+        default: true
+
+jobs:
+  train-and-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write        # required to create the release
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies (CPU torch only)
+        run: |
+          python -m pip install --upgrade pip
+          if [ "${{ inputs.include_nn }}" = "true" ]; then
+            pip install --index-url https://download.pytorch.org/whl/cpu "torch>=2.2,<3.0"
+          fi
+          pip install -r requirements.txt
+
+      - name: Train
+        run: |
+          python scripts/train_district_model.py \
+            --train "${{ inputs.train }}" \
+            --val "${{ inputs.val }}" \
+            --test "${{ inputs.test }}" \
+            --top-configs "${{ inputs.top_configs }}" \
+            ${{ inputs.include_nn == false && '--no-nn' || '' }} \
+            --out "data/models/${{ inputs.name }}"
+
+      - name: Package
+        id: package
+        run: |
+          python scripts/package_model_artifact.py \
+            --model-dir "data/models/${{ inputs.name }}" \
+            --name "${{ inputs.name }}"
+          echo "archive=dist/${{ inputs.name }}.tar.gz" >> "$GITHUB_OUTPUT"
+          echo "tag=model-${{ inputs.name }}-$(date +%Y%m%d%H%M)" >> "$GITHUB_OUTPUT"
+
+      - name: Verify the packaged artefact loads and scores
+        run: |
+          rm -rf /tmp/verify && mkdir -p /tmp/verify
+          python scripts/fetch_model_artifact.py \
+            --url "file://$PWD/${{ steps.package.outputs.archive }}" --dest /tmp/verify
+          MODEL_DIR=/tmp/verify python - <<'PY'
+          import sys, os
+          sys.path.insert(0, "scripts")
+          from district_model import DistrictPipeline
+          pipe = DistrictPipeline.load(os.environ["MODEL_DIR"])
+          assert pipe.ensemble_ is not None, "artefact unpacked but is not fitted"
+          print("loaded:", pipe.metadata_.get("train_years"), pipe.metadata_.get("members"))
+          PY
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.package.outputs.tag }}" \
+            "${{ steps.package.outputs.archive }}" \
+            "dist/${{ inputs.name }}.manifest.json" \
+            --title "District model ${{ inputs.name }}" \
+            --notes "Trained on ${{ inputs.train }}, validated on ${{ inputs.val }}.
+          Set MODEL_URL to the \`${{ inputs.name }}.tar.gz\` asset URL below, as a Railway
+          build argument for a self-contained image or as a service variable to fetch it
+          at run time. Accuracy for this build is in its metadata.json."
+          echo "MODEL_URL=$(gh release view '${{ steps.package.outputs.tag }}' \
+            --json assets --jq '.assets[] | select(.name|endswith(".tar.gz")) | .url')" \
+            >> "$GITHUB_STEP_SUMMARY"
