@@ -141,7 +141,33 @@ class ModelRegistry:
         pipeline = DistrictPipeline.load(settings.model_dir)
         if getattr(pipeline, "ensemble_", None) is None:
             raise ValueError(f"the artefact in {settings.model_dir} is not fitted")
+        _warn_on_version_skew(getattr(pipeline, "metadata_", {}) or {})
         return pipeline
+
+
+def _warn_on_version_skew(metadata: dict) -> None:
+    """Say so at load time when the serving libraries differ from the fitting ones.
+
+    A pickled estimator is only guaranteed to load in the version that wrote it.
+    scikit-learn 1.6 → 1.7 is the case that bit this service: the artefact
+    unpickles cleanly and then every prediction fails with
+    "AttributeError: 'SimpleImputer' object has no attribute '_fill_dtype'".
+    Artefacts built before versions were recorded simply skip this check.
+    """
+    fitted = metadata.get("library_versions")
+    if not fitted:
+        return
+    try:
+        from district_model import library_versions      # noqa: PLC0415
+    except ImportError:
+        return
+    running = library_versions()
+    skew = {k: (v, running.get(k)) for k, v in fitted.items()
+            if k in running and running[k] != v}
+    if skew:
+        detail = ", ".join(f"{k}: fitted {a}, running {b}" for k, (a, b) in sorted(skew.items()))
+        log.warning("library version skew between the artefact and this service — %s. "
+                    "Predictions may fail; pin these in requirements.txt.", detail)
 
     def require(self) -> Any:
         """The pipeline, or ModelUnavailable with the reason."""
