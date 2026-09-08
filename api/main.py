@@ -20,9 +20,10 @@ from fastapi.responses import JSONResponse
 
 from api import __version__
 from api.config import get_settings
+from api.curves import CurvesUnavailable, get_curves
 from api.defaults import DefaultsUnavailable, get_defaults
 from api.registry import ModelUnavailable, get_registry
-from api.routers import health, model, predict, reference
+from api.routers import health, model, predict, recommend, reference
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
@@ -37,6 +38,15 @@ Agronomic Survey (2016-2020).
 prediction interval and the number of plots behind it. Per-plot estimates are
 returned too, but they are much weaker (R2 ~0.16) than the district means the
 model was validated on (R2 0.22-0.59, MAE 300-700 kg/ha out-of-time).
+
+**What it recommends.** `POST /api/v1/recommend` ranks the changes available to
+one plot -- planting date, DAP, CAN topdress, hybrid seed share, variety,
+compost, lime, intercropping -- each with an expected lift in kg/ha, a
+district-clustered interval, and the evidence behind it. Everything is in yield
+units: this survey carries no price data, so the layer does not cost anything or
+budget anything. Lifts come from fixed-effects response curves, not from
+inverting the yield model, so this endpoint answers even when the model artefact
+is absent.
 
 **How to call it.** Send only what you know -- district, season, seed choice,
 fertiliser rates, planting date. Anything omitted is filled from that
@@ -57,6 +67,13 @@ async def lifespan(app: FastAPI):
                  len(defaults.districts), len(defaults.model_columns), defaults.years)
     except DefaultsUnavailable as exc:
         log.error("feature defaults unavailable: %s", exc)
+
+    try:
+        curves = get_curves()
+        log.info("lever curves: %d levers fitted %s",
+                 len(curves.levers), curves.generated_at)
+    except CurvesUnavailable as exc:
+        log.error("lever curves unavailable, /recommend will 503: %s", exc)
 
     if settings.eager_load:
         try:
@@ -94,12 +111,18 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(predict.router)
+app.include_router(recommend.router)
 app.include_router(model.router)
 app.include_router(reference.router)
 
 
 @app.exception_handler(DefaultsUnavailable)
 async def _defaults_unavailable(request: Request, exc: DefaultsUnavailable) -> JSONResponse:
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
+
+
+@app.exception_handler(CurvesUnavailable)
+async def _curves_unavailable(request: Request, exc: CurvesUnavailable) -> JSONResponse:
     return JSONResponse(status_code=503, content={"detail": str(exc)})
 
 
@@ -118,9 +141,11 @@ def index() -> dict:
         "docs": "/docs",
         "endpoints": {
             "predict": "POST /api/v1/predict",
+            "recommend": "POST /api/v1/recommend",
             "model_summary": "GET /api/v1/model/summary",
             "districts": "GET /api/v1/reference/districts",
             "seed_types": "GET /api/v1/reference/seed-types",
+            "levers": "GET /api/v1/reference/levers",
             "input_schema": "GET /api/v1/reference/input-schema",
             "health": "GET /health",
             "ready": "GET /ready",

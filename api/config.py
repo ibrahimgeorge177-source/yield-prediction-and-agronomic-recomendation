@@ -51,6 +51,17 @@ class Settings:
             "FEATURE_DEFAULTS_PATH",
             str(self.root / "data" / "api" / "feature_defaults.json")))
 
+        # Fitted lever response curves for the recommendation layer. Small
+        # (~100 KB) and committed, so /api/v1/recommend answers on a deployment
+        # whose model weights have not arrived.
+        self.lever_curves_path = Path(os.getenv(
+            "LEVER_CURVES_PATH",
+            str(self.root / "data" / "api" / "lever_curves.json")))
+
+        # Gates a recommendation must clear before it is offered at all.
+        self.min_lift_kg_ph = float(os.getenv("MIN_LIFT_KG_PH", "25"))
+        self.min_lift_z = float(os.getenv("MIN_LIFT_Z", "1.645"))
+
         # --- request limits -------------------------------------------------
         self.max_plots_per_request = int(os.getenv("MAX_PLOTS_PER_REQUEST", "500"))
 

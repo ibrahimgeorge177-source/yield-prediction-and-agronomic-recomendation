@@ -242,3 +242,152 @@ class HealthResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     detail: str
+
+
+# ---------------------------------------------------------------------------
+# recommendation request
+# ---------------------------------------------------------------------------
+# Everything here is in kilograms of maize per hectare. There is deliberately no
+# budget and no prices: the CRISP-DM report (§1.4) records that this workbook
+# carries no fertiliser or farm-gate price data, and that Project 1's
+# recommendation layer must stay in yield units rather than depending on price
+# assumptions nobody supplied.
+class RecommendationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    plot: PlotInput = Field(..., description="The plot to advise on. Same shape as "
+                                             "a prediction request's plot.")
+    year: int | None = Field(None, ge=2000, le=2100,
+                             description="Season, if the plot does not carry one.")
+    levers: list[str] | None = Field(
+        None, description="Restrict to these levers. "
+                          "GET /api/v1/reference/levers lists the names.")
+    min_lift_kg_ph: float = Field(
+        25, ge=0, le=2000,
+        description="Ignore changes worth less than this. Raise it to see only "
+                    "the changes that matter.")
+    min_support: int = Field(
+        200, ge=20, le=10000,
+        description="Refuse any target with fewer comparable plots behind it than "
+                    "this. Lowering it lets the curve speak where the data is thin.")
+    include_curve: bool = Field(
+        False, description="Return each lever's whole fitted response curve, for "
+                           "plotting rather than for advice.")
+
+
+# ---------------------------------------------------------------------------
+# recommendation response
+# ---------------------------------------------------------------------------
+class LeverEvidence(BaseModel):
+    """Why this number should or should not be believed."""
+
+    n_plots: int = Field(..., description="Plots the curve was fitted on.")
+    n_districts: int
+    support_at_target: int = Field(
+        ..., description="Plots observed near the recommended value. Thin support "
+                         "is the main way a fitted optimum misleads.")
+    confidence: Literal["high", "medium", "low"]
+    t_statistic: float = Field(..., description="Lift over its district-clustered "
+                                                "standard error.")
+    uncontrolled_lift_kg_ph: float | None = Field(
+        None, description="The same contrast with no covariates. The gap to the "
+                          "headline is how much of the raw association is who "
+                          "chooses the input rather than the input.")
+    control_absorbed_share: float | None = None
+    trained_to_2019_lift_kg_ph: float | None = Field(
+        None, description="The same contrast refit on 2016-2019 only.")
+    curve_shape: str
+    agronomically_plausible: bool = Field(
+        ..., description="Whether the fitted shape matches the agronomic prior "
+                         "(CRISP-DM §1.3). Fitted, not imposed.")
+
+
+class Recommendation(BaseModel):
+    rank: int
+    lever: str
+    label: str
+    action: str = Field(..., description="What to do, in plain words.")
+    current_value: Any = Field(..., description="What the plot does now.")
+    recommended_value: Any
+    unit: str | None = None
+    current_is_assumed: bool = Field(
+        ..., description="True when the request did not say what the plot does and "
+                         "the district's median practice was used instead.")
+    expected_lift_kg_ph: float
+    lift_low_kg_ph: float = Field(..., description="90% interval, district-clustered.")
+    lift_high_kg_ph: float
+    lift_share_of_district_yield: float | None = Field(
+        None, description="The lift as a fraction of the district's observed mean "
+                          "yield. The unit that says whether a number is large.")
+    why: str
+    evidence: LeverEvidence
+    curve: list[dict[str, Any]] | None = None
+
+
+class SkippedLever(BaseModel):
+    lever: str
+    label: str
+    current_value: Any = None
+    reason: str
+
+
+class RecommendationBundle(BaseModel):
+    """Every recommended change, taken together."""
+
+    levers: list[str]
+    total_expected_lift_kg_ph: float
+    lift_low_kg_ph: float
+    lift_high_kg_ph: float
+    lift_share_of_district_yield: float | None = None
+    district_mean_yield_kg_ph: float | None = None
+    note: str
+
+
+class RecommendationResponse(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
+    curves_version: str = Field(..., description="When the curves were fitted.")
+    district: str
+    district_known: bool
+    year: int | None = None
+    unit: str = "kg/ha"
+    plot_inputs_supplied: list[str] = Field(default_factory=list)
+    baseline_predicted_yield_kg_ph: float | None = Field(
+        None, description="The yield model's estimate for the plot as described, "
+                          "when the artefact is loaded. Recommendations do not "
+                          "depend on it.")
+    projected_yield_kg_ph: float | None = Field(
+        None, description="Baseline plus the bundle's lift. Inherits the baseline's "
+                          "per-plot uncertainty, which is large.")
+    recommendations: list[Recommendation] = Field(default_factory=list)
+    bundle: RecommendationBundle
+    skipped: list[SkippedLever] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    method_note: str
+    causal_note: str
+
+
+# ---------------------------------------------------------------------------
+# lever reference
+# ---------------------------------------------------------------------------
+class LeverSpec(BaseModel):
+    name: str
+    label: str
+    column: str
+    kind: Literal["continuous", "binary", "categorical"]
+    unit: str | None = None
+    n_plots: int
+    typical_value: Any = None
+    full_range_lift_kg_ph: float | None = None
+    curve_shape: str
+    agronomically_plausible: bool
+    why: str
+
+
+class LeversResponse(BaseModel):
+    curves_version: str
+    target: str
+    unit: str
+    method: str
+    fitted_on: dict[str, Any] = Field(default_factory=dict)
+    levers: list[LeverSpec]

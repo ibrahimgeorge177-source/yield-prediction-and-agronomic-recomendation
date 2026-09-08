@@ -8,9 +8,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, status
 
+from api.curves import CurvesUnavailable, get_curves
 from api.defaults import DefaultsUnavailable, get_defaults
 from api.schemas import (DistrictsResponse, ErrorResponse, FieldSpec, InputSchemaResponse,
-                         SeedTypesResponse)
+                         LeverSpec, LeversResponse, SeedTypesResponse)
 
 router = APIRouter(prefix="/api/v1/reference", tags=["reference"])
 
@@ -118,3 +119,46 @@ def _type_name(annotation) -> str:
         if needle in text:
             return name
     return "string"
+
+
+@router.get("/levers", response_model=LeversResponse,
+            responses={503: {"model": ErrorResponse}},
+            summary="Controllable levers the recommendation layer can advise on")
+def levers() -> LeversResponse:
+    """The decisions POST /api/v1/recommend is able to rank, with the shape of
+    each fitted curve and whether it matches its agronomic prior.
+
+    The set is chosen to span the farmer's decision space without overlapping
+    it. The feature file carries 45 ex-ante lever columns, but most restate one
+    another -- `n_kg_ph` and `total_nutrient_kg_ph` are arithmetic on the
+    fertiliser columns, `uses_hybrid_seed` is `hybrid_seed_share` thresholded --
+    and advising on all of them would credit one bag of DAP several times over.
+    """
+    try:
+        curves = get_curves()
+    except CurvesUnavailable as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
+
+    return LeversResponse(
+        curves_version=curves.generated_at,
+        target=curves.target,
+        unit="kg/ha",
+        method=curves.method,
+        fitted_on=curves.source,
+        levers=[
+            LeverSpec(
+                name=lever["name"],
+                label=lever["label"],
+                column=lever["column"],
+                kind=lever["kind"],
+                unit=lever["unit"],
+                n_plots=lever["n"],
+                typical_value=lever["population"]["median"],
+                full_range_lift_kg_ph=lever["diagnostics"].get("full_range_lift_kg_ph"),
+                curve_shape=lever["diagnostics"]["shape"],
+                agronomically_plausible=lever["diagnostics"]["agronomic_check"]["passed"],
+                why=lever["why"],
+            )
+            for lever in curves.levers
+        ],
+    )

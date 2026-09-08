@@ -1,11 +1,14 @@
-# Prediction API — reference
+# Prediction & recommendation API — reference
 
-**Kenya maize district yield model, served over HTTP.**
+**Kenya maize district yield model and agronomic recommendation layer, served
+over HTTP.**
 
 The service wraps the district-level model described in
 [kenya_maize_district_model_deployment.md](kenya_maize_district_model_deployment.md).
-That document is the authority on what the model can and cannot do; this one
-covers the HTTP contract.
+That document is the authority on what the model can and cannot do, and
+[kenya_maize_recommendation_layer.md](kenya_maize_recommendation_layer.md) is
+the authority on how the advice is estimated; this one covers the HTTP
+contract.
 
 ---
 
@@ -14,6 +17,7 @@ covers the HTTP contract.
 ```bash
 pip install -r requirements.txt
 python scripts/build_api_defaults.py        # once, and after any feature rebuild
+python scripts/build_lever_curves.py        # once, and after any feature rebuild
 uvicorn api.main:app --reload
 ```
 
@@ -191,7 +195,123 @@ demanding 143 columns does not meaningfully degrade the prediction.
 
 ---
 
-## 3 · `GET /api/v1/model/summary`
+## 3 · `POST /api/v1/recommend`
+
+Ranks the changes available to one plot, each with an expected yield lift, an
+interval and the evidence behind it. This is the field-agent surface of
+CRISP-DM report §6.1.
+
+**Everything is in kg/ha.** There is no costing and no budget. Report §1.4
+records that this workbook carries no fertiliser or farm-gate price data and
+that Project 1's recommendation layer must stay in yield units rather than
+depending on price assumptions nobody supplied. Turning a lift into money is
+Project 3's scope.
+
+**It does not need the model artefact.** Lifts come from the fitted lever
+curves in `data/api/lever_curves.json`, which are committed. A deployment whose
+`pipeline.joblib` never arrived still gives advice; only the optional
+`baseline_predicted_yield_kg_ph` is omitted, with a warning.
+
+### Request
+
+```json
+{
+  "plot": { "district": "bungoma", "plant_date_doy": 110,
+            "seed_category": "local", "dap_kg_ph": 0, "can_kg_ph": 0,
+            "plot_acres": 1.0 },
+  "year": 2020
+}
+```
+
+`plot` is exactly the `PlotInput` of `/predict`, so a frontend uses one form for
+both. Everything else is optional:
+
+| Field | Effect |
+|---|---|
+| `levers` | Restrict to named levers. `GET /api/v1/reference/levers` lists them. |
+| `min_lift_kg_ph` | Ignore changes worth less than this (default 25). |
+| `min_support` | Refuse any target with fewer comparable plots behind it (default 200). |
+| `include_curve` | Return each lever's whole fitted response curve, for plotting. |
+
+The request model forbids unknown fields, so a stray `budget`, `prices` or
+`objective` is a `422` rather than a silently ignored key.
+
+### Response
+
+```json
+{
+  "district": "bungoma", "district_known": true, "year": 2020,
+  "recommendations": [
+    {
+      "rank": 1, "lever": "hybrid_seed", "label": "Share of seed that is hybrid",
+      "action": "plant a larger share of hybrid seed — 0.95 share of seed (0-1) (now 0)",
+      "current_value": 0.0, "recommended_value": 0.95,
+      "current_is_assumed": false,
+      "expected_lift_kg_ph": 586.4,
+      "lift_low_kg_ph": 545.8, "lift_high_kg_ph": 627.0,
+      "lift_share_of_district_yield": 0.197,
+      "evidence": {
+        "n_plots": 22809, "n_districts": 51, "support_at_target": 17481,
+        "confidence": "high", "t_statistic": 23.75,
+        "uncontrolled_lift_kg_ph": 829.6, "control_absorbed_share": 0.293,
+        "trained_to_2019_lift_kg_ph": 591.2,
+        "curve_shape": "concave_increasing", "agronomically_plausible": true
+      }
+    }
+  ],
+  "bundle": { "levers": ["hybrid_seed", "..."], "total_expected_lift_kg_ph": 2447.4,
+              "lift_low_kg_ph": 1806.3, "lift_high_kg_ph": 3088.5,
+              "lift_share_of_district_yield": 0.821,
+              "district_mean_yield_kg_ph": 2982.6, "note": "..." },
+  "skipped": [{ "lever": "intercropping", "reason": "no change to this lever clears the evidence threshold..." }],
+  "warnings": ["..."], "method_note": "...", "causal_note": "..."
+}
+```
+
+Four fields deserve attention because they are what separate this from a
+confident-looking number:
+
+- **`current_is_assumed`** — `true` when the request did not say what the plot
+  currently does, so the district's median practice stood in. The lift then
+  describes a typical plot in that district, not this one.
+- **`support_at_target`** — plots observed near the recommended value. Thin
+  support is the main way a fitted optimum misleads: only 4% of plots apply any
+  lime, so its fitted optimum sits in a region holding ~100 of them.
+- **`uncontrolled_lift_kg_ph`** — the same contrast fitted with no covariates.
+  The gap to the headline is how much of the raw association is *who chooses the
+  input* rather than the input. It runs 29–50% across levers.
+- **`trained_to_2019_lift_kg_ph`** — the same contrast refit on 2016–2019 only.
+
+`skipped` is not an error list. "No change to this lever clears the evidence
+threshold" for a plot already at its district's fitted optimum is the correct
+answer, and an empty `recommendations` array is a legitimate response.
+
+### Why the lift is not read off the yield model
+
+Report §4.1 proposes a constrained search over the trained GBM's predicted
+surface. That is the wrong instrument here and the notebooks say why: per-plot
+out-of-time R² is ~0.16 and `district` alone accounts for ~60% of the model's
+holdout performance, so optimising over that surface returns advice with a
+precision the evidence cannot carry.
+
+The estimand advice needs is different from the one the model targets — not
+*what will this plot yield* but *how does yield move when this decision moves* —
+and that average gradient is estimable from ~21,000 plots even where per-plot
+prediction is weak. Notebook 03 §6 demonstrated it on planting date; the
+recommendation layer generalises the same fixed-effects method to every ex-ante
+lever. Full method, fitted curves and limitations:
+[kenya_maize_recommendation_layer.md](kenya_maize_recommendation_layer.md).
+
+### Errors
+
+| Status | When |
+|---|---|
+| `422` | Malformed plot, or an unknown lever name (the message lists the valid ones). An unknown *district* is not an error — it is advised, with a warning. |
+| `503` | `feature_defaults.json` or `lever_curves.json` is missing. Build them with the two scripts in §1. |
+
+---
+
+## 4 · `GET /api/v1/model/summary`
 
 What the deployed model is and how well it does. Everything quantitative comes
 from the artefact's `metadata.json`, so a retrained model reports its own
@@ -212,20 +332,21 @@ district size and why the R² ≥ 0.70 target is unreachable with this data,
 
 ---
 
-## 4 · Reference and health
+## 5 · Reference and health
 
 | Endpoint | Returns |
 |---|---|
 | `GET /api/v1/reference/districts` | The 51 districts the model knows, and the seasons available. |
 | `GET /api/v1/reference/seed-types` | Seed categories, varieties, primary varieties, intercrop species. |
 | `GET /api/v1/reference/input-schema` | Every accepted field with type, unit, allowed values and observed range — enough to build and validate a form. |
+| `GET /api/v1/reference/levers` | The eight controllable levers `/recommend` can advise on, each with its fitted curve shape and whether it matches its agronomic prior. |
 | `GET /health` | Liveness. Answers `ok`/`degraded` even with no model. Use for platform health checks. |
 | `GET /ready` | Readiness: `200` only when defaults are present and the model loads. Use to gate traffic. |
 | `GET /` | Service index. |
 
 ---
 
-## 5 · Regenerating the fill values
+## 6 · Regenerating the artefacts
 
 `data/api/feature_defaults.json` holds per-district and per-district-season
 medians and modes for all 143 model columns, the category vocabularies, the
@@ -239,11 +360,28 @@ Rebuild it whenever the feature file or the recommended-feature list changes.
 It needs only pandas and numpy — not the model stack — and stores no
 target-derived quantity, so it carries no leakage.
 
----
-
-## 6 · Tests
+`data/api/lever_curves.json` (~38 KB) holds the fitted response curve for each
+lever: its spline basis, coefficients, district-clustered covariance, the
+support behind each proposable value, and the uncontrolled and 2016–2019 refits
+used as diagnostics.
 
 ```bash
-pytest tests/test_api.py                              # model-dependent tests skip
-MODEL_DIR=data/models/district_v2 pytest tests/test_api.py   # full suite
+python scripts/build_lever_curves.py
 ```
+
+Also pandas and numpy only. Unlike the fill values this artefact **is**
+target-derived — it is a set of regression coefficients — so it must be refit,
+not carried forward, whenever the feature file changes.
+
+---
+
+## 7 · Tests
+
+```bash
+pytest tests/                                         # model-dependent tests skip
+MODEL_DIR=data/models/district_v2 pytest tests/       # full suite
+```
+
+`tests/test_api.py` covers prediction; `tests/test_recommend.py` covers the
+recommendation layer and needs no artefact at all, since the curves are
+committed.
