@@ -12,9 +12,17 @@ import { districtName, titleCase } from '../lib/format'
  * true to the data rather than being hard-coded here.
  */
 
+/** Seasons the form offers beyond the ones the survey observed. */
+export const FORECAST_FROM = 2021
+export const FORECAST_TO = 2030
+
+/** Today's season, held inside the offered range so the select always matches. */
+const defaultYear = () =>
+  Math.min(Math.max(new Date().getFullYear(), FORECAST_FROM), FORECAST_TO)
+
 export const EMPTY_PLOT = {
   district: '',
-  year: new Date().getFullYear(),
+  year: defaultYear(),
   seed_category: '',
   plot_acres: '',
   dap_kg_ph: '',
@@ -70,10 +78,16 @@ export default function PlotForm({ plot, onChange, districts = [], schema, seaso
     'hybrid_branded', 'other_hybrid', 'local', 'mixed',
   ]
 
-  const yearOptions = useMemo(() => {
-    const known = seasons.length ? seasons : [2016, 2017, 2018, 2019, 2020]
-    const next = Math.max(...known) + 1
-    return [...known, next, next + 1]
+  // Observed seasons come from the API; forecasting seasons run to 2030. The two
+  // are separated because they are answered differently: an observed season has
+  // real weather behind it, a future one falls back to the district's
+  // climatology, which is a weaker basis and the hint says so.
+  const { observed, future } = useMemo(() => {
+    const known = seasons.length ? [...seasons].sort((a, b) => a - b) : [2016, 2017, 2018, 2019, 2020]
+    const start = Math.max(Math.max(...known) + 1, FORECAST_FROM)
+    const ahead = []
+    for (let y = start; y <= FORECAST_TO; y += 1) ahead.push(y)
+    return { observed: known, future: ahead }
   }, [seasons])
 
   return (
@@ -88,11 +102,18 @@ export default function PlotForm({ plot, onChange, districts = [], schema, seaso
           </select>
         </Field>
 
-        <Field label="Season" id="year" hint="future seasons use that district's climatology">
+        <Field label="Season" id="year" hint="seasons after 2020 use that district's climatology">
           <select id="year" value={plot.year} onChange={set('year')}>
-            {yearOptions.map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
+            <optgroup label="Observed seasons">
+              {observed.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </optgroup>
+            <optgroup label="Forecast seasons · district climatology">
+              {future.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </optgroup>
           </select>
         </Field>
       </div>

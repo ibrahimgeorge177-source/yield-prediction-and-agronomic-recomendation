@@ -44,3 +44,5 @@ venv/
 # Packaged model artefacts written by scripts/package_model_artifact.py, ready
 # to attach to a release. Same reason as the pipeline.joblib above: ~120 MB.
 dist/
+node_modules/
+
