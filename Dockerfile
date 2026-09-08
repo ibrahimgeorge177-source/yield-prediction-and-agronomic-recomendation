@@ -116,6 +116,13 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
     CMD curl -fsS "http://127.0.0.1:${PORT:-8000}/health" || exit 1
 
-# Shell form so Railway's injected $PORT is expanded. One worker by default:
-# each worker loads its own copy of the pipeline, about 700 MB resident.
-CMD ["sh", "-c", "exec uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-1} --timeout-keep-alive 65"]
+# Shell form so the platform's injected $PORT is expanded. One worker by
+# default: each worker loads its own copy of the pipeline, about 700 MB resident.
+#
+# Do NOT duplicate this as a `startCommand` in railway.json. That overrides the
+# CMD, and a start command is not guaranteed to be evaluated by a shell -- if it
+# is not, uvicorn receives the literal string "$PORT", exits immediately, and
+# the platform reports "Application failed to respond" with nothing listening.
+# The echo puts the resolved port in the deploy logs, which is the first thing
+# to check when a platform cannot reach the container.
+CMD ["sh", "-c", "echo \"starting uvicorn on 0.0.0.0:${PORT:-8000} (workers=${WEB_CONCURRENCY:-1})\" && exec uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-1} --timeout-keep-alive 65 --proxy-headers --forwarded-allow-ips '*'"]

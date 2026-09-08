@@ -185,6 +185,8 @@ resolves `data/models/district_v2` on its own.
 
 | Symptom | Cause and fix |
 |---|---|
+| **`502 "Application failed to respond"` on every path, ~15 s** | Nothing is listening on the port Railway routes to. In order of likelihood: (1) a `startCommand` in `railway.json` or in the service settings is overriding the image `CMD` — remove it and let the Dockerfile run, since a start command is not guaranteed to be shell-evaluated and `$PORT` then arrives at uvicorn as a literal string; (2) the container crashed at boot — read the **Deploy Logs**, not the HTTP logs, and look for the `starting uvicorn on 0.0.0.0:<port>` line the image prints; (3) the process was OOM-killed — see §2 sizing. |
+| Deploy logs show `Error: Invalid value for '--port': '$PORT' is not a valid integer` | Exactly the override above. Delete the start command. |
 | `503` from `/api/v1/predict`, `/health` says `degraded` | No artefact. `GET /api/v1/model/summary` reports `artefact_dir`; set `MODEL_URL` or fix `MODEL_DIR`. |
 | Container OOM-killed shortly after the first prediction | The model needs ~720 MB resident. Raise memory to 2 GB, set `WEB_CONCURRENCY=1`, or build the `--no-nn` artefact. |
 | `ModuleNotFoundError: district_model` while loading | The artefact was pickled with `scripts/` importable. The image copies `scripts/district_model.py` and `district_nn.py`; keep both when trimming. |
