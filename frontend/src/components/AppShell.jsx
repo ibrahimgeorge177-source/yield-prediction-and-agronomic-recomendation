@@ -1,7 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
-import { isOnline, useOnline, useTheme } from '../lib/hooks'
+import { isOnline, useOnline, useReference, useTheme } from '../lib/hooks'
 import {
   IconAdvisor, IconDocs, IconForecast, IconHome, IconMaize, IconModel, IconMoon, IconSun,
 } from './Icons'
@@ -78,6 +78,12 @@ export function StatusPill({ status }) {
 export default function AppShell() {
   const status = useServiceStatus()
   const [theme, toggleTheme] = useTheme()
+
+  // Warm the shared reference data once, from the shell. Forecast and Advisor
+  // then mount with their district list and field ranges already in cache
+  // instead of each paying for the round trip on first open.
+  useReference('districts', api.districts)
+  useReference('input-schema', api.inputSchema)
 
   return (
     <div className="shell">

@@ -11,10 +11,24 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!--
+      Loaded without blocking the first paint: on a slow connection a webfont
+      stylesheet in the critical path holds the whole page back. The media
+      switch promotes it once it has arrived, and the fallback stack in
+      global.css carries the text until then.
+    -->
     <link
       href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
       rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
     />
+    <noscript>
+      <link
+        href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+        rel="stylesheet"
+      />
+    </noscript>
 
     <title>Kenya Maize Yield Forecast</title>
   </head>

@@ -32,6 +32,13 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         navigateFallback: 'index.html',
+        // A worker from an earlier build must not outlive its assets. Without
+        // these three, an updated deploy can leave a tab running the old bundle
+        // against newly served files, which surfaces as a blank page on the
+        // next route change rather than as anything diagnosable.
+        cleanupOutdatedCaches: true,
+        skipWaiting: true,
+        clientsClaim: true,
         runtimeCaching: [
           {
             // Reference data changes rarely and makes the app useful offline:
