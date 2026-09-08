@@ -24,3 +24,12 @@ secrets/
 # it stopped. Fully reproducible from Earth Engine, and ~700 tiny files.
 # The committed artefacts are the assembled panel and climatology beside it.
 data/weather/_gee_cache/
+
+# Serialised model artefacts written by scripts/train_district_model.py. Each is
+# 90-125 MB of fitted forests and network weights -- above GitHub's 100 MB file
+# limit, and regenerated in ~4 minutes from the recipe that IS committed
+# (data/models/06_final_model_config.json) with:
+#   python scripts/train_district_model.py --out data/models/district_v1
+# The metadata.json beside each artefact is small and stays tracked, so the
+# training seasons and measured accuracy of a build remain in the history.
+data/models/**/pipeline.joblib
