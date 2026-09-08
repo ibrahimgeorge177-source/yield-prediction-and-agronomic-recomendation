@@ -23,7 +23,7 @@
 #   docker build -t maize-api --build-arg INCLUDE_TORCH=false .   # tree-only artefact
 #
 # Run:
-#   docker run -p 8000:8000 -e MODEL_DIR=/models -v "$PWD/data/models/district_v2:/models:ro" maize-api
+#   docker run -p 8080:8080 -e MODEL_DIR=/models -v "$PWD/data/models/district_v2:/models:ro" maize-api
 
 # ---------------------------------------------------------------------------
 # builder — resolve dependencies into a virtualenv
@@ -81,7 +81,7 @@ ENV PATH="/opt/venv/bin:$PATH" \
     MODEL_DIR=/app/data/models/district_v2 \
     MODEL_VERSION=district_v2 \
     ENVIRONMENT=production \
-    PORT=8000 \
+    PORT=8080 \
     WEB_CONCURRENCY=1
 
 WORKDIR /app
@@ -108,13 +108,18 @@ RUN mkdir -p "$MODEL_DIR" \
     && chown -R appuser:appuser /app
 
 USER appuser
-EXPOSE 8000
+
+# 8080 is the port Railway targets when a service has no explicit PORT variable.
+# The server still binds whatever $PORT the platform injects; this only decides
+# what it falls back to, and it must agree with EXPOSE or the platform's proxy
+# dials a port nothing is listening on ("connection dial timeout").
+EXPOSE 8080
 
 # /health reports liveness and stays 200 while the model is still loading, so a
 # platform healthcheck never kills a container that is merely warming up.
 # /ready is the stricter gate and requires the artefact.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
-    CMD curl -fsS "http://127.0.0.1:${PORT:-8000}/health" || exit 1
+    CMD curl -fsS "http://127.0.0.1:${PORT:-8080}/health" || exit 1
 
 # Shell form so the platform's injected $PORT is expanded. One worker by
 # default: each worker loads its own copy of the pipeline, about 700 MB resident.
@@ -125,4 +130,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
 # the platform reports "Application failed to respond" with nothing listening.
 # The echo puts the resolved port in the deploy logs, which is the first thing
 # to check when a platform cannot reach the container.
-CMD ["sh", "-c", "echo \"starting uvicorn on 0.0.0.0:${PORT:-8000} (workers=${WEB_CONCURRENCY:-1})\" && exec uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-1} --timeout-keep-alive 65 --proxy-headers --forwarded-allow-ips '*'"]
+CMD ["sh", "-c", "echo \"starting uvicorn on 0.0.0.0:${PORT:-8080} (workers=${WEB_CONCURRENCY:-1})\" && exec uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8080} --workers ${WEB_CONCURRENCY:-1} --timeout-keep-alive 65 --proxy-headers --forwarded-allow-ips '*'"]

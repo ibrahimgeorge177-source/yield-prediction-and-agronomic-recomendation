@@ -119,7 +119,7 @@ receive traffic".
 
 | Variable | Default | Notes |
 |---|---|---|
-| `PORT` | injected by Railway | The start command reads it; do not hard-code it. |
+| `PORT` | `8080` in the image | The server binds whatever Railway injects and falls back to 8080, which matches `EXPOSE` and Railway's default target port. **Set it explicitly if the proxy reports `connection dial timeout`** — that error means Railway is dialling a port the container is not listening on. |
 | `MODEL_URL` | — | Artefact archive (`.tar.gz`, `.zip` or bare `.joblib`). Works as a build argument *and* at run time. |
 | `MODEL_DIR` | `/app/data/models/district_v2` | Point at a mounted volume to serve from one. |
 | `MODEL_VERSION` | `district_v2` | Reported by `/` and `/api/v1/model/summary`. |
@@ -167,7 +167,7 @@ retraining.
 docker build -t maize-api .
 
 # serve, mounting a locally trained artefact read-only
-docker run --rm -p 8000:8000 \
+docker run --rm -p 8080:8080 \
   -e MODEL_DIR=/models -e MODEL_EAGER_LOAD=true \
   -v "$PWD/data/models/district_v2:/models:ro" \
   maize-api

@@ -48,10 +48,10 @@ jobs:
 
       - name: Start container
         run: |
-          docker run -d --name maize-api -p 8000:8000 \
+          docker run -d --name maize-api -p 8080:8080 \
             -e ENVIRONMENT=ci -e LOG_LEVEL=INFO maize-api:ci
           for i in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:8000/health > /dev/null 2>&1; then
+            if curl -fsS http://127.0.0.1:8080/health > /dev/null 2>&1; then
               echo "up after ${i}s"; exit 0
             fi
             sleep 1
@@ -61,18 +61,18 @@ jobs:
       - name: Smoke test — endpoints that work without the model artefact
         run: |
           set -euo pipefail
-          curl -fsS http://127.0.0.1:8000/health | tee /dev/stderr | grep -q '"status"'
-          curl -fsS http://127.0.0.1:8000/ | grep -q '"endpoints"'
-          curl -fsS http://127.0.0.1:8000/api/v1/model/summary | grep -q '"model_version"'
-          curl -fsS http://127.0.0.1:8000/api/v1/reference/districts | grep -q '\['
-          curl -fsS http://127.0.0.1:8000/openapi.json > /dev/null
+          curl -fsS http://127.0.0.1:8080/health | tee /dev/stderr | grep -q '"status"'
+          curl -fsS http://127.0.0.1:8080/ | grep -q '"endpoints"'
+          curl -fsS http://127.0.0.1:8080/api/v1/model/summary | grep -q '"model_version"'
+          curl -fsS http://127.0.0.1:8080/api/v1/reference/districts | grep -q '\['
+          curl -fsS http://127.0.0.1:8080/openapi.json > /dev/null
           echo "reference and health endpoints OK"
 
       - name: Smoke test — prediction degrades honestly without an artefact
         run: |
           set -euo pipefail
           code=$(curl -s -o /tmp/body.json -w '%{http_code}' \
-            -X POST http://127.0.0.1:8000/api/v1/predict \
+            -X POST http://127.0.0.1:8080/api/v1/predict \
             -H 'Content-Type: application/json' \
             -d '{"plots":[{"district":"kabiyet","year":2021}]}')
           cat /tmp/body.json
