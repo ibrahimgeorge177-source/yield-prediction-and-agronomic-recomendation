@@ -144,6 +144,12 @@ class ModelRegistry:
         _warn_on_version_skew(getattr(pipeline, "metadata_", {}) or {})
         return pipeline
 
+    def require(self) -> Any:
+        """The pipeline, or ModelUnavailable with the reason."""
+        if self._pipeline is not None:
+            return self._pipeline
+        return self.load()
+
 
 def _warn_on_version_skew(metadata: dict) -> None:
     """Say so at load time when the serving libraries differ from the fitting ones.
@@ -168,12 +174,6 @@ def _warn_on_version_skew(metadata: dict) -> None:
         detail = ", ".join(f"{k}: fitted {a}, running {b}" for k, (a, b) in sorted(skew.items()))
         log.warning("library version skew between the artefact and this service — %s. "
                     "Predictions may fail; pin these in requirements.txt.", detail)
-
-    def require(self) -> Any:
-        """The pipeline, or ModelUnavailable with the reason."""
-        if self._pipeline is not None:
-            return self._pipeline
-        return self.load()
 
 
 GZIP_MAGIC, ZIP_MAGIC = b"\x1f\x8b", b"PK\x03\x04"

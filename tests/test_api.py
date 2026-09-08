@@ -198,3 +198,59 @@ def test_plot_predictions_can_be_suppressed():
 @needs_model
 def test_ready_returns_200_once_the_model_loads():
     assert client.get("/ready").status_code == 200
+
+
+# --- the prediction path must hold together with or without an artefact ------
+# These run everywhere, including a checkout with no pipeline.joblib, which is
+# the point: the failure they were written for was a route calling a registry
+# method that no longer existed, and it reached production because every test
+# that touches /predict needed the model and was therefore skipped in CI.
+
+def test_predict_never_answers_with_a_bare_500(monkeypatch):
+    """With no model, /predict must degrade to 503 with a reason.
+
+    A 500 here means the route broke before it ever consulted the registry --
+    exactly what an AttributeError inside the handler looks like from outside.
+    """
+    from api import registry
+
+    def unavailable():
+        raise registry.ModelUnavailable("no artefact in this test")
+
+    monkeypatch.setattr(registry.get_registry(), "require", unavailable)
+
+    response = client.post("/api/v1/predict", json={"plots": [{"district": "bungoma"}]})
+    assert response.status_code == 503, response.text
+    assert "not available" in response.json()["detail"]
+
+
+def test_registry_exposes_the_methods_the_routers_call():
+    """The routers reach for these by name; losing one is a 500 in production."""
+    from api.registry import get_registry
+
+    registry = get_registry()
+    for name in ("require", "load", "status", "metadata", "is_loaded", "error"):
+        assert hasattr(registry, name), f"ModelRegistry lost {name}()"
+    assert callable(registry.require)
+
+
+def test_unhandled_errors_come_back_as_json_with_cors_headers(monkeypatch):
+    """A browser must be able to read the error, not just see a network failure.
+
+    Starlette's default 500 is raised outside the CORS middleware, so the
+    browser reports the API as unreachable. The catch-all middleware exists to
+    keep the response readable; this pins that behaviour.
+    """
+    from api import registry
+
+    def boom():
+        raise RuntimeError("deliberate test explosion")
+
+    monkeypatch.setattr(registry.get_registry(), "require", boom)
+
+    response = client.post("/api/v1/predict",
+                           json={"plots": [{"district": "bungoma"}]},
+                           headers={"Origin": "https://example.test"})
+    assert response.status_code == 500
+    assert "deliberate test explosion" in response.json()["detail"]
+    assert response.headers.get("access-control-allow-origin") is not None

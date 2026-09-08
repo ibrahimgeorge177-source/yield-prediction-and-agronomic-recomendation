@@ -101,6 +101,26 @@ app = FastAPI(
     openapi_url="/openapi.json",
 )
 
+@app.middleware("http")
+async def catch_unhandled(request: Request, call_next):
+    """Turn an unhandled exception into a JSON response, from inside CORS.
+
+    Starlette's default 500 is a bare text body produced outside the CORS
+    middleware, so a browser never sees the response at all — it reports a
+    network failure and the caller is told the API is unreachable when in fact
+    it answered. Handling it here keeps the CORS headers on the response, so the
+    real error reaches the client instead of a misleading one.
+    """
+    try:
+        return await call_next(request)
+    except Exception as exc:                              # noqa: BLE001 - deliberate boundary
+        log.exception("unhandled error on %s %s", request.method, request.url.path)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"internal error: {type(exc).__name__}: {exc}"},
+        )
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
