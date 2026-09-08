@@ -33,3 +33,10 @@ data/weather/_gee_cache/
 # The metadata.json beside each artefact is small and stays tracked, so the
 # training seasons and measured accuracy of a build remain in the history.
 data/models/**/pipeline.joblib
+
+# Python virtual environments.
+.venv/
+venv/
+
+# Pytest / tooling caches.
+.pytest_cache/
